@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  cancer-ai:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./phi3_lora_model:/app/phi3_lora_model:ro
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
