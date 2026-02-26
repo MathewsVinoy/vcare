@@ -17,6 +17,10 @@ app = Flask(__name__)
 MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'model_cache')
 os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
 
+# Offload directory for model layers that don't fit in memory
+OFFLOAD_DIR = os.path.join(os.path.dirname(__file__), 'model_offload')
+os.makedirs(OFFLOAD_DIR, exist_ok=True)
+
 # Load the Random Forest model for blood sample
 blood_model = None
 blood_model_loaded = False
@@ -145,7 +149,8 @@ def load_chat_model():
                 device_map=device_map,
                 quantization_config=quantization_config,
                 trust_remote_code=True,
-                cache_dir=MODEL_CACHE_DIR
+                cache_dir=MODEL_CACHE_DIR,
+                offload_folder=OFFLOAD_DIR  # Enable disk offloading
             )
         else:
             # CPU: Use float32
@@ -159,12 +164,19 @@ def load_chat_model():
                 torch_dtype=torch.float32,
                 device_map=device_map,
                 trust_remote_code=True,
-                cache_dir=MODEL_CACHE_DIR
+                cache_dir=MODEL_CACHE_DIR,
+                offload_folder=OFFLOAD_DIR  # Enable disk offloading
             )
         
-        # Load LoRA adapter
+        # Load LoRA adapter with offload support
         print("Loading LoRA adapter...")
-        chat_model = PeftModel.from_pretrained(chat_model, adapter_path)
+        # Note: PeftModel needs the offload_dir via adapter loading, not from_pretrained
+        import accelerate
+        chat_model = PeftModel.from_pretrained(
+            chat_model, 
+            adapter_path,
+            offload_dir=OFFLOAD_DIR  # Pass offload directory for adapter layers
+        )
         
         # Don't merge - just use the adapter as-is (merging can cause issues with device_map)
         print("Using model with LoRA adapter (non-merged mode)")
