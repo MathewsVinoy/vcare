@@ -6,10 +6,16 @@ import torchvision
 from torchvision import transforms
 from PIL import Image
 import io
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
+from config import CHAT_MODEL_CONFIG, FLASK_CONFIG
 
 app = Flask(__name__)
+
+# Local directory for model cache
+MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'model_cache')
+os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
 
 # Load the Random Forest model for blood sample
 blood_model = None
@@ -20,10 +26,11 @@ image_model = None
 image_model_loaded = False
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# Load the fine-tuned Phi-3 model for chat
+# Load the fine-tuned Phi-3 model for chat (lazy loaded on first use)
 chat_model = None
 chat_tokenizer = None
 chat_model_loaded = False
+chat_model_loading = False
 
 # Load Random Forest model for blood sample
 try:
@@ -58,40 +65,125 @@ except FileNotFoundError:
 except Exception as e:
     print(f"❌ Error loading image model: {e}")
 
-# Load fine-tuned Phi-3 model for chat
-try:
-    print("Loading Phi-3 chat model...")
-    base_model_name = "microsoft/Phi-3-mini-4k-instruct"
-    adapter_path = "phi3_lora_model"
+# Lazy load function for Phi-3 chat model
+def load_chat_model():
+    """Load the Phi-3 model on first use to avoid OOM at startup"""
+    global chat_model, chat_tokenizer, chat_model_loaded, chat_model_loading
     
-    # Load tokenizer
-    chat_tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+    if chat_model_loaded:
+        return True
     
-    # Load base model
-    chat_model = AutoModelForCausalLM.from_pretrained(
-        base_model_name,
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        device_map="auto" if torch.cuda.is_available() else None,
-        trust_remote_code=True
-    )
+    if chat_model_loading:
+        return False
     
-    # Load LoRA adapter
-    chat_model = PeftModel.from_pretrained(chat_model, adapter_path)
-    chat_model = chat_model.merge_and_unload()  # Merge adapter weights with base model
+    chat_model_loading = True
     
-    if not torch.cuda.is_available():
-        chat_model = chat_model.to('cpu')
-    
-    chat_model.eval()
-    chat_model_loaded = True
-    print(f"✅ Phi-3 chat model loaded successfully on {device}!")
-except FileNotFoundError as e:
-    print(f"❌ Chat model files not found: {e}")
-    print("Please ensure 'phi3_lora_model' directory exists with the adapter files")
-except Exception as e:
-    print(f"❌ Error loading chat model: {e}")
-    import traceback
-    traceback.print_exc()
+    try:
+        print("Loading Phi-3 chat model (this may take a minute)...")
+        base_model_name = CHAT_MODEL_CONFIG['base_model']
+        adapter_path = CHAT_MODEL_CONFIG['adapter_path']
+        use_8bit = CHAT_MODEL_CONFIG['use_8bit']
+        use_4bit = CHAT_MODEL_CONFIG['use_4bit']
+        
+        print(f"Using local model cache: {MODEL_CACHE_DIR}")
+        
+        # Load tokenizer
+        chat_tokenizer = AutoTokenizer.from_pretrained(
+            base_model_name, 
+            trust_remote_code=True,
+            cache_dir=MODEL_CACHE_DIR
+        )
+        
+        # Determine optimal loading parameters
+        use_cuda = torch.cuda.is_available()
+        
+        # Prepare quantization config if requested
+        quantization_config = None
+        if use_4bit and use_8bit:
+            print("⚠️ Both 4-bit and 8-bit quantization requested. Using 4-bit (more aggressive).")
+            use_8bit = False
+        
+        if use_4bit:
+            try:
+                print("Configuring 4-bit quantization (reduces memory by ~8x)...")
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16 if use_cuda else torch.float32,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_use_double_quant=True
+                )
+            except Exception as e:
+                print(f"⚠️ 4-bit quantization failed: {e}. Install bitsandbytes: pip install bitsandbytes")
+                quantization_config = None
+        elif use_8bit:
+            try:
+                print("Configuring 8-bit quantization (reduces memory by ~4x)...")
+                quantization_config = BitsAndBytesConfig(
+                    load_in_8bit=True,
+                )
+            except Exception as e:
+                print(f"⚠️ 8-bit quantization failed: {e}. Install bitsandbytes: pip install bitsandbytes")
+                quantization_config = None
+        
+        # Load base model with optimizations
+        if use_cuda:
+            # GPU: Use float16 for efficiency
+            chat_model = AutoModelForCausalLM.from_pretrained(
+                base_model_name,
+                dtype=torch.float16,
+                device_map="auto",
+                quantization_config=quantization_config,
+                trust_remote_code=True,
+                cache_dir=MODEL_CACHE_DIR
+            )
+        else:
+            # CPU: Use float32 but with low_cpu_mem_usage for efficiency
+            print("Loading on CPU with memory optimization...")
+            if quantization_config:
+                print("⚠️ Quantization is not well supported on CPU. Loading without quantization.")
+                quantization_config = None
+            
+            chat_model = AutoModelForCausalLM.from_pretrained(
+                base_model_name,
+                dtype=torch.float32,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+                cache_dir=MODEL_CACHE_DIR
+            )
+            chat_model = chat_model.to('cpu')
+        
+        # Load LoRA adapter
+        print("Loading LoRA adapter...")
+        chat_model = PeftModel.from_pretrained(chat_model, adapter_path)
+        
+        # Only merge if not quantized (merging with quantized models can cause issues)
+        if quantization_config is None:
+            chat_model = chat_model.merge_and_unload()  # Merge adapter weights with base model
+        
+        chat_model.eval()
+        chat_model_loaded = True
+        chat_model_loading = False
+        
+        quant_info = ""
+        if use_4bit:
+            quant_info = " (4-bit quantized)"
+        elif use_8bit:
+            quant_info = " (8-bit quantized)"
+        
+        print(f"✅ Phi-3 chat model loaded successfully on {device}{quant_info}!")
+        return True
+        
+    except FileNotFoundError as e:
+        print(f"❌ Chat model files not found: {e}")
+        print("Please ensure 'phi3_lora_model' directory exists with the adapter files")
+        chat_model_loading = False
+        return False
+    except Exception as e:
+        print(f"❌ Error loading chat model: {e}")
+        import traceback
+        traceback.print_exc()
+        chat_model_loading = False
+        return False
 
 @app.route('/')
 def index():
@@ -175,9 +267,23 @@ def predict_blood_sample():
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
-        if not chat_model_loaded or chat_model is None or chat_tokenizer is None:
+        # Load model on first use if not already loaded
+        if not chat_model_loaded:
+            if chat_model_loading:
+                return jsonify({
+                    'response': 'Chat model is currently loading. Please try again in a moment.',
+                    'error': True
+                }), 503
+            
+            if not load_chat_model():
+                return jsonify({
+                    'response': 'Failed to load chat model. Please check the server logs.',
+                    'error': True
+                }), 500
+        
+        if chat_model is None or chat_tokenizer is None:
             return jsonify({
-                'response': 'Chat model is not loaded. Please check the server logs.',
+                'response': 'Chat model is not available.',
                 'error': True
             }), 500
         
@@ -213,9 +319,9 @@ def chat():
         with torch.no_grad():
             outputs = chat_model.generate(
                 **inputs,
-                max_new_tokens=512,
-                temperature=0.7,
-                top_p=0.9,
+                max_new_tokens=CHAT_MODEL_CONFIG['max_new_tokens'],
+                temperature=CHAT_MODEL_CONFIG['temperature'],
+                top_p=CHAT_MODEL_CONFIG['top_p'],
                 do_sample=True,
                 pad_token_id=chat_tokenizer.eos_token_id,
                 eos_token_id=chat_tokenizer.eos_token_id
@@ -308,4 +414,23 @@ def predict_skin_cancer():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("\n" + "="*60)
+    print("🏥 Medical Diagnosis Application Starting")
+    print("="*60)
+    print(f"Blood Sample Model: {'✅ Loaded' if blood_model_loaded else '❌ Not loaded'}")
+    print(f"Image Detection Model: {'✅ Loaded' if image_model_loaded else '❌ Not loaded'}")
+    print(f"Chat Model: ⏳ Will load on first use (lazy loading)")
+    print(f"Device: {device}")
+    print(f"\nQuantization Config:")
+    print(f"  - 4-bit: {CHAT_MODEL_CONFIG['use_4bit']}")
+    print(f"  - 8-bit: {CHAT_MODEL_CONFIG['use_8bit']}")
+    print(f"\nTo enable quantization (reduces memory by 4-8x):")
+    print(f"  export USE_4BIT_QUANTIZATION=true  # Most aggressive")
+    print(f"  export USE_8BIT_QUANTIZATION=true  # Balanced")
+    print("="*60 + "\n")
+    
+    app.run(
+        debug=FLASK_CONFIG['debug'],
+        host=FLASK_CONFIG['host'],
+        port=FLASK_CONFIG['port']
+    )
