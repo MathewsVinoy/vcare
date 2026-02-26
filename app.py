@@ -150,7 +150,7 @@ def load_chat_model():
                 quantization_config=quantization_config,
                 trust_remote_code=True,
                 cache_dir=MODEL_CACHE_DIR,
-                offload_folder=OFFLOAD_DIR  # Enable disk offloading
+                low_cpu_mem_usage=True
             )
         else:
             # CPU: Use float32
@@ -165,18 +165,12 @@ def load_chat_model():
                 device_map=device_map,
                 trust_remote_code=True,
                 cache_dir=MODEL_CACHE_DIR,
-                offload_folder=OFFLOAD_DIR  # Enable disk offloading
+                low_cpu_mem_usage=True
             )
         
-        # Load LoRA adapter with offload support
+        # Load LoRA adapter
         print("Loading LoRA adapter...")
-        # Note: PeftModel needs the offload_dir via adapter loading, not from_pretrained
-        import accelerate
-        chat_model = PeftModel.from_pretrained(
-            chat_model, 
-            adapter_path,
-            offload_dir=OFFLOAD_DIR  # Pass offload directory for adapter layers
-        )
+        chat_model = PeftModel.from_pretrained(chat_model, adapter_path)
         
         # Don't merge - just use the adapter as-is (merging can cause issues with device_map)
         print("Using model with LoRA adapter (non-merged mode)")
@@ -334,7 +328,15 @@ def chat():
             return_tensors="pt",
             truncation=True,
             max_length=2048
-        ).to(chat_model.device)
+        )
+        # Move inputs to the same device as the first model parameter
+        # (works with device_map="auto")
+        if hasattr(chat_model, 'device'):
+            inputs = {k: v.to(chat_model.device) for k, v in inputs.items()}
+        else:
+            # For models with device_map, find the device of the first parameter
+            first_device = next(chat_model.parameters()).device
+            inputs = {k: v.to(first_device) for k, v in inputs.items()}
         
         # Generate response
         with torch.no_grad():
