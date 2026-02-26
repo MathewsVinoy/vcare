@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT Clone</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-comment-dots"></i>
+                <span>VCAN</span>
+            </div>
+            <nav class="nav">
+                <a href="/" class="nav-link">Chat</a>
+                <a href="/blood_sample" class="nav-link">Blood Sample</a>
+                <a href="/image_detection" class="nav-link">Image</a>
+            </nav>
+            <div class="auth-buttons">
+                <button class="btn-login">Log in</button>
+                <button class="btn-signup">Sign up for free</button>
+                <button class="btn-help">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="chat-container">
+            <div class="welcome-section">
+                <h1 class="welcome-title">What can I help with?</h1>
+            </div>
+
+            <div class="messages-container" id="messagesContainer">
+                <!-- Messages will appear here -->
+            </div>
+            
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <input type="text" 
+                           class="chat-input" 
+                           placeholder="Ask anything"
+                           id="chatInput">
+                    <button class="send-btn">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="action-btn" onclick="window.location.href='/blood_sample'">
+                        <i class="fas fa-droplet"></i>
+                        <span>Blood Sample</span>
+                    </button>
+                    <button class="action-btn" onclick="window.location.href='/image_detection'">
+                        <i class="fas fa-image"></i>
+                        <span>Image</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
