@@ -17,6 +17,10 @@ app = Flask(__name__)
 MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'model_cache')
 os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
 
+# Offload directory for model layers that don't fit in memory
+OFFLOAD_DIR = os.path.join(os.path.dirname(__file__), 'model_offload')
+os.makedirs(OFFLOAD_DIR, exist_ok=True)
+
 # Load the Random Forest model for blood sample
 blood_model = None
 blood_model_loaded = False
@@ -134,7 +138,8 @@ def load_chat_model():
                 device_map="auto",
                 quantization_config=quantization_config,
                 trust_remote_code=True,
-                cache_dir=MODEL_CACHE_DIR
+                cache_dir=MODEL_CACHE_DIR,
+                offload_folder=OFFLOAD_DIR  # Enable disk offloading for layers that don't fit
             )
         else:
             # CPU: Use float32 but with low_cpu_mem_usage for efficiency
@@ -148,13 +153,18 @@ def load_chat_model():
                 dtype=torch.float32,
                 low_cpu_mem_usage=True,
                 trust_remote_code=True,
-                cache_dir=MODEL_CACHE_DIR
+                cache_dir=MODEL_CACHE_DIR,
+                device_map="auto",
+                offload_folder=OFFLOAD_DIR  # Enable disk offloading for layers that don't fit
             )
-            chat_model = chat_model.to('cpu')
         
         # Load LoRA adapter
         print("Loading LoRA adapter...")
-        chat_model = PeftModel.from_pretrained(chat_model, adapter_path)
+        chat_model = PeftModel.from_pretrained(
+            chat_model, 
+            adapter_path,
+            offload_folder=OFFLOAD_DIR  # Enable disk offloading for adapter layers
+        )
         
         # Only merge if not quantized (merging with quantized models can cause issues)
         if quantization_config is None:
