@@ -166,9 +166,18 @@ def load_chat_model():
             offload_folder=OFFLOAD_DIR  # Enable disk offloading for adapter layers
         )
         
-        # Only merge if not quantized (merging with quantized models can cause issues)
-        if quantization_config is None:
-            chat_model = chat_model.merge_and_unload()  # Merge adapter weights with base model
+        # Only merge if not quantized and not using offloading
+        # (merging with quantized or offloaded models can cause issues)
+        should_merge = quantization_config is None and not use_cuda
+        if should_merge:
+            try:
+                print("Merging adapter weights with base model...")
+                chat_model = chat_model.merge_and_unload()  # Merge adapter weights with base model
+            except Exception as e:
+                print(f"⚠️ Could not merge adapter (will use adapter mode): {e}")
+                # Continue without merging - adapter mode works fine
+        else:
+            print("Using adapter in non-merged mode (due to quantization or offloading)")
         
         chat_model.eval()
         chat_model_loaded = True
