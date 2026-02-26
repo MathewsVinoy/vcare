@@ -17,10 +17,6 @@ app = Flask(__name__)
 MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'model_cache')
 os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
 
-# Offload directory for model layers that don't fit in memory
-OFFLOAD_DIR = os.path.join(os.path.dirname(__file__), 'model_offload')
-os.makedirs(OFFLOAD_DIR, exist_ok=True)
-
 # Load the Random Forest model for blood sample
 blood_model = None
 blood_model_loaded = False
@@ -101,83 +97,77 @@ def load_chat_model():
         # Determine optimal loading parameters
         use_cuda = torch.cuda.is_available()
         
+        # Set device_map based on hardware
+        device_map = "auto" if use_cuda else {"": "cpu"}
+        
         # Prepare quantization config if requested
         quantization_config = None
         if use_4bit and use_8bit:
             print("⚠️ Both 4-bit and 8-bit quantization requested. Using 4-bit (more aggressive).")
             use_8bit = False
         
-        if use_4bit:
+        if use_4bit and use_cuda:
             try:
-                print("Configuring 4-bit quantization (reduces memory by ~8x)...")
-                quantization_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype=torch.float16 if use_cuda else torch.float32,
-                    bnb_4bit_quant_type="nf4",
-                    bnb_4bit_use_double_quant=True
-                )
+                from transformers.utils import is_bitsandbytes_available
+                if is_bitsandbytes_available():
+                    print("Configuring 4-bit quantization (reduces memory by ~8x)...")
+                    cuda_bf16 = torch.cuda.is_bf16_supported()
+                    quantization_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16 if cuda_bf16 else torch.float16,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_use_double_quant=True
+                    )
+                else:
+                    print("⚠️ bitsandbytes not available. Install with: pip install bitsandbytes")
             except Exception as e:
-                print(f"⚠️ 4-bit quantization failed: {e}. Install bitsandbytes: pip install bitsandbytes")
+                print(f"⚠️ 4-bit quantization failed: {e}")
                 quantization_config = None
-        elif use_8bit:
+        elif use_8bit and use_cuda:
             try:
                 print("Configuring 8-bit quantization (reduces memory by ~4x)...")
                 quantization_config = BitsAndBytesConfig(
                     load_in_8bit=True,
                 )
             except Exception as e:
-                print(f"⚠️ 8-bit quantization failed: {e}. Install bitsandbytes: pip install bitsandbytes")
+                print(f"⚠️ 8-bit quantization failed: {e}")
                 quantization_config = None
         
         # Load base model with optimizations
         if use_cuda:
-            # GPU: Use float16 for efficiency
+            # GPU: Use bfloat16 if available, else float16
+            cuda_bf16 = torch.cuda.is_bf16_supported()
+            torch_dtype = torch.bfloat16 if cuda_bf16 else torch.float16
+            print(f"Loading model on GPU with {torch_dtype}...")
             chat_model = AutoModelForCausalLM.from_pretrained(
                 base_model_name,
-                dtype=torch.float16,
-                device_map="auto",
+                torch_dtype=torch_dtype,
+                device_map=device_map,
                 quantization_config=quantization_config,
                 trust_remote_code=True,
-                cache_dir=MODEL_CACHE_DIR,
-                offload_folder=OFFLOAD_DIR  # Enable disk offloading for layers that don't fit
+                cache_dir=MODEL_CACHE_DIR
             )
         else:
-            # CPU: Use float32 but with low_cpu_mem_usage for efficiency
-            print("Loading on CPU with memory optimization...")
+            # CPU: Use float32
+            print("Loading model on CPU with float32...")
             if quantization_config:
-                print("⚠️ Quantization is not well supported on CPU. Loading without quantization.")
+                print("⚠️ Quantization is not supported on CPU. Loading without quantization.")
                 quantization_config = None
             
             chat_model = AutoModelForCausalLM.from_pretrained(
                 base_model_name,
-                dtype=torch.float32,
-                low_cpu_mem_usage=True,
+                torch_dtype=torch.float32,
+                device_map=device_map,
                 trust_remote_code=True,
-                cache_dir=MODEL_CACHE_DIR,
-                device_map="auto",
-                offload_folder=OFFLOAD_DIR  # Enable disk offloading for layers that don't fit
+                cache_dir=MODEL_CACHE_DIR
             )
         
         # Load LoRA adapter
         print("Loading LoRA adapter...")
-        chat_model = PeftModel.from_pretrained(
-            chat_model, 
-            adapter_path,
-            offload_folder=OFFLOAD_DIR  # Enable disk offloading for adapter layers
-        )
+        chat_model = PeftModel.from_pretrained(chat_model, adapter_path)
         
-        # Only merge if not quantized and not using offloading
-        # (merging with quantized or offloaded models can cause issues)
-        should_merge = quantization_config is None and not use_cuda
-        if should_merge:
-            try:
-                print("Merging adapter weights with base model...")
-                chat_model = chat_model.merge_and_unload()  # Merge adapter weights with base model
-            except Exception as e:
-                print(f"⚠️ Could not merge adapter (will use adapter mode): {e}")
-                # Continue without merging - adapter mode works fine
-        else:
-            print("Using adapter in non-merged mode (due to quantization or offloading)")
+        # Don't merge - just use the adapter as-is (merging can cause issues with device_map)
+        print("Using model with LoRA adapter (non-merged mode)")
         
         chat_model.eval()
         chat_model_loaded = True
@@ -343,7 +333,8 @@ def chat():
                 top_p=CHAT_MODEL_CONFIG['top_p'],
                 do_sample=True,
                 pad_token_id=chat_tokenizer.eos_token_id,
-                eos_token_id=chat_tokenizer.eos_token_id
+                eos_token_id=chat_tokenizer.eos_token_id,
+                use_cache=False  # Disable cache to avoid DynamicCache compatibility issues
             )
         
         # Decode the response
