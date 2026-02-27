@@ -45,6 +45,7 @@ setuptools==70.2.0
 six==1.17.0
 sympy==1.14.0
 tokenizers==0.22.1
+transformers>=4.40.0
 bitsandbytes>=0.41.0
 
 torch>=2.0.0
