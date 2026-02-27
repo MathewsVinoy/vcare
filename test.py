@@ -25,18 +25,18 @@ tokenizer = AutoTokenizer.from_pretrained(
 # Load base model
 base_model = AutoModelForCausalLM.from_pretrained(
     model_name,
-    device_map="auto",
     torch_dtype=torch.float16,  # Use float16 for efficiency
     trust_remote_code=False,  # Use transformers' built-in implementation
     cache_dir=cache_dir,
-    attn_implementation="eager"  # Use eager attention for better compatibility
+    attn_implementation="eager",  # Use eager attention for better compatibility
+    low_cpu_mem_usage=True
 )
 
 # Load LoRA adapter weights on top of base model
 model = PeftModel.from_pretrained(
     base_model,
     lora_adapter_path,
-    torch_dtype=torch.float16
+    device_map="auto"
 )
 
 print(f"Fine-tuned model loaded successfully on device: {model.device}")
