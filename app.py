@@ -27,46 +27,58 @@ model = None
 tokenizer = None
 pipe = None
 blood_model = None
-blood_model_loaded = False
 image_model = None
-image_model_loaded = False
 
-try:
-    import joblib
-    blood_model = joblib.load('model/random_forest_model.joblib')
-    blood_model_loaded = True
-    print("✅ Blood sample model loaded successfully!")
-except ImportError as e:
-    print(f"❌ Import error: {e}")
-    print("Please install: pip install joblib scikit-learn")
-    blood_model_loaded = False
-except FileNotFoundError:
-    print("❌ Model file not found at 'model/random_forest_model.joblib'")
-    blood_model_loaded = False
-except Exception as e:
-    print(f"❌ Error loading blood model: {e}")
-    blood_model_loaded = False
-
-# Load PyTorch Vision Transformer model for skin cancer detection
-try:
-    def get_vit_model(num_classes=2):
-        model = torchvision.models.vit_b_16(weights="IMAGENET1K_V1")
-        in_features = model.heads.head.in_features
-        model.heads.head = nn.Linear(in_features, num_classes)
-        return model
+def load_blood_model():
+    """Lazy load the blood sample model when needed"""
+    global blood_model
     
-    image_model = get_vit_model(num_classes=2)
-    image_model.load_state_dict(torch.load('model/model.pth', map_location=device))
-    image_model = image_model.to(device)
-    image_model.eval()
-    image_model_loaded = True
-    print(f"✅ Skin cancer detection model loaded successfully on {device}!")
-except FileNotFoundError:
-    print("❌ PyTorch model file not found at 'model/model.pth'")
-    image_model_loaded = False
-except Exception as e:
-    print(f"❌ Error loading image model: {e}")
-    image_model_loaded = False
+    if blood_model is not None:
+        return True
+    
+    try:
+        import joblib
+        blood_model = joblib.load('model/random_forest_model.joblib')
+        print("✅ Blood sample model loaded successfully!")
+        return True
+    except ImportError as e:
+        print(f"❌ Import error: {e}")
+        print("Please install: pip install joblib scikit-learn")
+        return False
+    except FileNotFoundError:
+        print("❌ Model file not found at 'model/random_forest_model.joblib'")
+        return False
+    except Exception as e:
+        print(f"❌ Error loading blood model: {e}")
+        return False
+
+def get_vit_model(num_classes=2):
+    """Create ViT model architecture"""
+    model = torchvision.models.vit_b_16(weights="IMAGENET1K_V1")
+    in_features = model.heads.head.in_features
+    model.heads.head = nn.Linear(in_features, num_classes)
+    return model
+
+def load_image_model():
+    """Lazy load the skin cancer detection model when needed"""
+    global image_model
+    
+    if image_model is not None:
+        return True
+    
+    try:
+        image_model = get_vit_model(num_classes=2)
+        image_model.load_state_dict(torch.load('model/model.pth', map_location=device))
+        image_model = image_model.to(device)
+        image_model.eval()
+        print(f"✅ Skin cancer detection model loaded successfully on {device}!")
+        return True
+    except FileNotFoundError:
+        print("❌ PyTorch model file not found at 'model/model.pth'")
+        return False
+    except Exception as e:
+        print(f"❌ Error loading image model: {e}")
+        return False
 
 def load_model():
     """Load the Phi-3 model with LoRA adapter"""
@@ -145,7 +157,8 @@ def image_detection():
 @app.route('/predict_blood_sample', methods=['POST'])
 def predict_blood_sample():
     try:
-        if not blood_model_loaded or blood_model is None:
+        # Lazy load blood model only when needed
+        if not load_blood_model():
             return jsonify({
                 'error': 'Model not loaded. Please install dependencies: pip install joblib scikit-learn',
                 'success': False
@@ -244,7 +257,8 @@ def health():
 @app.route('/predict_skin_cancer', methods=['POST'])
 def predict_skin_cancer():
     try:
-        if not image_model_loaded or image_model is None:
+        # Lazy load image model only when needed
+        if not load_image_model():
             return jsonify({
                 'error': 'Image model not loaded. Please check if model/model.pth exists.',
                 'success': False
