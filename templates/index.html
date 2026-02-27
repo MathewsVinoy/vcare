@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phi-3 Cancer Diagnosis Assistant</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🏥 Phi-3 Cancer Diagnosis Assistant</h1>
+        <p class="subtitle">AI-powered medical information assistant</p>
+      </header>
+
+      <div class="chat-container">
+        <div id="chat-messages" class="chat-messages">
+          <div class="message bot-message">
+            <div class="message-content">
+              <strong>Phi-3:</strong> Hello! I'm a medical AI assistant trained
+              to help with cancer-related questions. How can I help you today?
+            </div>
+            <div class="message-time">Just now</div>
+          </div>
+        </div>
+
+        <div class="input-container">
+          <textarea
+            id="user-input"
+            placeholder="Ask me about cancer symptoms, diagnosis, or treatment..."
+            rows="3"
+          ></textarea>
+          <button id="send-btn" onclick="sendMessage()">
+            <span id="btn-text">Send</span>
+            <span id="btn-loading" style="display: none">⏳</span>
+          </button>
+        </div>
+      </div>
+
+      <footer>
+        <p class="disclaimer">
+          ⚠️ <strong>Disclaimer:</strong> This AI assistant is for informational
+          purposes only and should not replace professional medical advice,
+          diagnosis, or treatment.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      const chatMessages = document.getElementById("chat-messages");
+      const userInput = document.getElementById("user-input");
+      const sendBtn = document.getElementById("send-btn");
+      const btnText = document.getElementById("btn-text");
+      const btnLoading = document.getElementById("btn-loading");
+
+      // Send message on Enter (Shift+Enter for new line)
+      userInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      function sendMessage() {
+        const message = userInput.value.trim();
+
+        if (!message) {
+          return;
+        }
+
+        // Add user message to chat
+        addMessage(message, "user");
+
+        // Clear input
+        userInput.value = "";
+
+        // Disable send button
+        sendBtn.disabled = true;
+        btnText.style.display = "none";
+        btnLoading.style.display = "inline";
+
+        // Send to backend
+        fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: message }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.status === "success") {
+              addMessage(data.response, "bot");
+            } else {
+              addMessage(
+                "Sorry, an error occurred: " + data.error,
+                "bot",
+                true,
+              );
+            }
+          })
+          .catch((error) => {
+            addMessage(
+              "Sorry, I encountered an error. Please try again.",
+              "bot",
+              true,
+            );
+            console.error("Error:", error);
+          })
+          .finally(() => {
+            // Re-enable send button
+            sendBtn.disabled = false;
+            btnText.style.display = "inline";
+            btnLoading.style.display = "none";
+          });
+      }
+
+      function addMessage(text, sender, isError = false) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${sender}-message ${isError ? "error-message" : ""}`;
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "message-content";
+
+        if (sender === "bot") {
+          contentDiv.innerHTML = `<strong>Phi-3:</strong> ${escapeHtml(text)}`;
+        } else {
+          contentDiv.innerHTML = `<strong>You:</strong> ${escapeHtml(text)}`;
+        }
+
+        const timeDiv = document.createElement("div");
+        timeDiv.className = "message-time";
+        timeDiv.textContent = new Date().toLocaleTimeString();
+
+        messageDiv.appendChild(contentDiv);
+        messageDiv.appendChild(timeDiv);
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML.replace(/\n/g, "<br>");
+      }
+
+      // Check if model is loaded
+      fetch("/health")
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.status === "loading") {
+            addMessage(
+              "Model is still loading... Please wait a moment.",
+              "bot",
+            );
+          }
+        })
+        .catch((error) => {
+          console.error("Health check failed:", error);
+        });
+    </script>
+  </body>
+</html>
