@@ -1,26 +1,29 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from peft import PeftModel
 import os
 
 # Model configuration
 model_name = "microsoft/Phi-3-mini-4k-instruct"
+lora_adapter_path = os.path.join(os.path.dirname(__file__), "phi3_lora_model")
 
 # Set local cache directory
 cache_dir = os.path.join(os.path.dirname(__file__), "model_cache")
 os.makedirs(cache_dir, exist_ok=True)
 
-print("Loading Phi-3 model...")
-print(f"Model: {model_name}")
+print("Loading Phi-3 base model with cancer diagnosis fine-tuning...")
+print(f"Base Model: {model_name}")
+print(f"LoRA Adapter: {lora_adapter_path}")
 print(f"Cache directory: {cache_dir}")
 
-# Load tokenizer and model
+# Load tokenizer from the fine-tuned model directory (includes special tokens)
 tokenizer = AutoTokenizer.from_pretrained(
-    model_name,
-    trust_remote_code=False,  # Use transformers' built-in implementation
-    cache_dir=cache_dir
+    lora_adapter_path,
+    trust_remote_code=False
 )
 
-model = AutoModelForCausalLM.from_pretrained(
+# Load base model
+base_model = AutoModelForCausalLM.from_pretrained(
     model_name,
     device_map="auto",
     torch_dtype=torch.float16,  # Use float16 for efficiency
@@ -29,7 +32,14 @@ model = AutoModelForCausalLM.from_pretrained(
     attn_implementation="eager"  # Use eager attention for better compatibility
 )
 
-print(f"Model loaded successfully on device: {model.device}")
+# Load LoRA adapter weights on top of base model
+model = PeftModel.from_pretrained(
+    base_model,
+    lora_adapter_path,
+    torch_dtype=torch.float16
+)
+
+print(f"Fine-tuned model loaded successfully on device: {model.device}")
 
 # Create a text generation pipeline
 pipe = pipeline(
@@ -60,11 +70,11 @@ def chat(prompt):
 # Test the model
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print("Phi-3 Model Ready!")
+    print("Phi-3 Cancer Diagnosis Model Ready!")
     print("="*50 + "\n")
     
-    # Example prompt
-    test_prompt = "What is machine learning? Explain in simple terms."
+    # Example prompt for cancer diagnosis
+    test_prompt = "What are the common symptoms of breast cancer?"
     
     print(f"User: {test_prompt}\n")
     response = chat(test_prompt)
