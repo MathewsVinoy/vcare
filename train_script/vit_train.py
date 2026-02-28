@@ -53,11 +53,26 @@ dataset = SkinCancerDataset(
 )
 BATCH_SIZE = 32
 
-from torch.utils.data import DataLoader
+# ========================
+# Train-Test Split
+# ========================
+from torch.utils.data import DataLoader, random_split
+
+# Split dataset into 80% train and 20% test
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
 train_dataloader = DataLoader(
-    dataset=dataset,
+    dataset=train_dataset,
     batch_size=BATCH_SIZE,
     shuffle=True
+)
+
+test_dataloader = DataLoader(
+    dataset=test_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=False
 )
 
 # ========================
@@ -87,8 +102,11 @@ scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
 # Training Loop
 # ========================
 for epoch in range(epochs):
+    # Training phase
     model.train()
     train_loss = 0
+    train_correct = 0
+    train_total = 0
 
     for images, labels in train_dataloader:
         images, labels = images.to(device), labels.to(device)
@@ -100,9 +118,43 @@ for epoch in range(epochs):
         optimizer.step()
 
         train_loss += loss.item()
+        
+        # Calculate training accuracy
+        _, predicted = torch.max(outputs.data, 1)
+        train_total += labels.size(0)
+        train_correct += (predicted == labels).sum().item()
+
+    train_accuracy = 100 * train_correct / train_total
+    avg_train_loss = train_loss / len(train_dataloader)
+
+    # Testing/Evaluation phase
+    model.eval()
+    test_loss = 0
+    test_correct = 0
+    test_total = 0
+
+    with torch.no_grad():
+        for images, labels in test_dataloader:
+            images, labels = images.to(device), labels.to(device)
+
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            test_loss += loss.item()
+
+            # Calculate test accuracy
+            _, predicted = torch.max(outputs.data, 1)
+            test_total += labels.size(0)
+            test_correct += (predicted == labels).sum().item()
+
+    test_accuracy = 100 * test_correct / test_total
+    avg_test_loss = test_loss / len(test_dataloader)
 
     scheduler.step()
 
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {train_loss/len(train_dataloader):.4f}")
+    print(f"Epoch {epoch+1}/{epochs} | "
+          f"Train Loss: {avg_train_loss:.4f}, Train Acc: {train_accuracy:.2f}% | "
+          f"Test Loss: {avg_test_loss:.4f}, Test Acc: {test_accuracy:.2f}%")
 
+print("\nTraining completed!")
 torch.save(model.state_dict(), "efficientformer_model.pth")
+print("Model saved as 'efficientformer_model.pth'")
