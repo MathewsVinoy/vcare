@@ -47,8 +47,8 @@ transform = transforms.Compose([
 ])
 
 dataset = SkinCancerDataset(
-    csv_file="../data/image/HAM10000_metadata.csv",
-    img_dir="../data/image/ham10000_images_part_1/",  # path to folder with .jpg images
+    csv_file="../data/HAM10000_metadata.csv",
+    img_dir="../data/HAM10000_images_part_1/",  # path to folder with .jpg images
     transform=transform
 )
 BATCH_SIZE = 32
