@@ -26,7 +26,9 @@
   -webkit-backdrop-filter: blur(20px);
   border-radius: 24px;
   padding: 3rem;
-  box-shadow: 0 10px 40px rgba(211, 47, 47, 0.12), 0 4px 16px rgba(255, 138, 159, 0.08);
+  box-shadow:
+    0 10px 40px rgba(211, 47, 47, 0.12),
+    0 4px 16px rgba(255, 138, 159, 0.08);
   max-width: 1000px;
   margin: 0 auto;
   width: 100%;
@@ -36,7 +38,9 @@
 }
 
 .form-container:hover {
-  box-shadow: 0 15px 50px rgba(211, 47, 47, 0.15), 0 6px 20px rgba(255, 138, 159, 0.12);
+  box-shadow:
+    0 15px 50px rgba(211, 47, 47, 0.15),
+    0 6px 20px rgba(255, 138, 159, 0.12);
   border-color: rgba(255, 205, 210, 0.7);
 }
 
@@ -56,9 +60,15 @@
   transform: translateX(5px);
 }
 
-.form-section:nth-child(1) { animation-delay: 0.4s; }
-.form-section:nth-child(2) { animation-delay: 0.5s; }
-.form-section:nth-child(3) { animation-delay: 0.6s; }
+.form-section:nth-child(1) {
+  animation-delay: 0.4s;
+}
+.form-section:nth-child(2) {
+  animation-delay: 0.5s;
+}
+.form-section:nth-child(3) {
+  animation-delay: 0.6s;
+}
 
 .form-section:last-of-type {
   border-bottom: none;
@@ -80,7 +90,7 @@
 }
 
 .section-title::before {
-  content: '';
+  content: "";
   width: 4px;
   height: 24px;
   background: linear-gradient(135deg, #d32f2f 0%, #f44336 100%);
@@ -126,7 +136,8 @@
 }
 
 @keyframes iconBounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -163,7 +174,9 @@
 .form-group select:focus {
   outline: none;
   border-color: #f44336;
-  box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.1), 0 4px 12px rgba(211, 47, 47, 0.15);
+  box-shadow:
+    0 0 0 4px rgba(244, 67, 54, 0.1),
+    0 4px 12px rgba(211, 47, 47, 0.15);
   background: #ffffff;
   transform: translateY(-1px);
 }
@@ -198,7 +211,7 @@
 }
 
 .btn-predict.loading::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 16px;
   height: 16px;
@@ -246,7 +259,7 @@
 
 .btn-predict::before,
 .btn-reset::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -254,7 +267,9 @@
   height: 0;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  transition: width 0.5s, height 0.5s;
+  transition:
+    width 0.5s,
+    height 0.5s;
 }
 
 .btn-predict {
@@ -336,19 +351,25 @@
   border: 3px solid rgba(255, 205, 210, 0.6);
   border-radius: 24px;
   padding: 2.5rem;
-  box-shadow: 0 12px 40px rgba(211, 47, 47, 0.15), 0 6px 20px rgba(255, 138, 159, 0.1);
+  box-shadow:
+    0 12px 40px rgba(211, 47, 47, 0.15),
+    0 6px 20px rgba(255, 138, 159, 0.1);
   position: relative;
   overflow: hidden;
 }
 
 .result-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -50%;
   right: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255, 205, 210, 0.15) 0%, transparent 70%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 205, 210, 0.15) 0%,
+    transparent 70%
+  );
   animation: rotate 20s linear infinite;
 }
 
