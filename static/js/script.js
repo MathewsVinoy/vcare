@@ -1,85 +1,153 @@
-document.addEventListener('DOMContentLoaded', function() {
+/* VCare AI — Chat Script (index.html) */
+
+document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
-    const sendBtn = document.querySelector('.send-btn');
-    const messagesContainer = document.getElementById('messagesContainer');
-    const chatContainer = document.querySelector('.chat-container');
+    const sendBtn = document.getElementById('sendBtn');
+    const messagesList = document.getElementById('messagesList');
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    const modelStatus = document.getElementById('modelStatus');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const sidebar = document.getElementById('sidebar');
+
     let chatStarted = false;
 
-    // Handle Enter key press
-    chatInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && chatInput.value.trim()) {
-            sendMessage(chatInput.value.trim());
-            chatInput.value = '';
-        }
-    });
+    // -- Sidebar --
+    sidebarToggle?.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+    mobileMenuBtn?.addEventListener('click', () => sidebar.classList.toggle('open'));
 
-    // Handle send button click
-    sendBtn.addEventListener('click', function() {
-        if (chatInput.value.trim()) {
-            sendMessage(chatInput.value.trim());
-            chatInput.value = '';
-        }
-    });
-
-    // Handle action button clicks
-    document.querySelectorAll('.action-btn').forEach(btn => {
-        if (!btn.hasAttribute('onclick')) {
-            btn.addEventListener('click', function() {
-                const action = this.querySelector('span').textContent;
-                alert(`${action} feature - Coming soon!`);
-            });
-        }
-    });
-
-    function sendMessage(message) {
-        // First message - transform UI
-        if (!chatStarted) {
-            chatStarted = true;
-            
-            // Add chat-active class to hide welcome section and show messages
-            chatContainer.classList.add('chat-active');
-            
-            
-        }
-        
-        // Add user message immediately
-        addMessage(message, 'user');
-
-        // Simulate assistant response or send to server
-        setTimeout(() => {
-            // Try to send to server
-            fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: message })
+    // -- Model Status --
+    function checkModelStatus() {
+        fetch('/health')
+            .then(r => r.json())
+            .then(d => {
+                const dot = modelStatus.querySelector('.status-dot');
+                const text = modelStatus.querySelector('.status-text');
+                if (d.model_loaded) {
+                    dot.classList.add('active');
+                    text.textContent = 'Model Ready';
+                } else {
+                    dot.classList.remove('active');
+                    text.textContent = 'Loading model…';
+                    setTimeout(checkModelStatus, 4000);
+                }
             })
-            .then(response => response.json())
-            .then(data => {
-                // Add assistant response from server
-                addMessage(data.response, 'assistant');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                // Provide a mock response if server fails
-                addMessage('Terima kasih atas pesannya! Saya siap membantu Anda. Silakan bertanya apa saja yang Anda butuhkan.', 'assistant');
+            .catch(() => {
+                const text = modelStatus?.querySelector('.status-text');
+                if (text) text.textContent = 'Offline';
             });
-        }, 500);
     }
 
-    function addMessage(text, type) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${type}`;
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.textContent = text;
-        
-        messageDiv.appendChild(contentDiv);
-        messagesContainer.appendChild(messageDiv);
-        
-        // Scroll to bottom
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    checkModelStatus();
+
+    // -- Auto-resize textarea --
+    chatInput.addEventListener('input', () => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + 'px';
+    });
+
+    // -- Send on Enter (Shift+Enter = newline) --
+    chatInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            triggerSend();
+        }
+    });
+
+    sendBtn.addEventListener('click', triggerSend);
+
+    function triggerSend() {
+        const msg = chatInput.value.trim();
+        if (!msg) return;
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        sendMessage(msg);
+    }
+
+    // -- Suggestion chips --
+    window.fillSuggestion = (text) => {
+        chatInput.value = text;
+        chatInput.focus();
+        triggerSend();
+    };
+
+    // -- Send message flow --
+    function sendMessage(text) {
+        if (!chatStarted) {
+            chatStarted = true;
+            welcomeScreen.style.display = 'none';
+            messagesList.classList.add('visible');
+        }
+
+        appendMessage(text, 'user');
+        const typingEl = appendTyping();
+
+        fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text })
+        })
+            .then(r => r.json())
+            .then(d => {
+                removeTyping(typingEl);
+                appendMessage(d.response || 'Sorry, I couldn\'t generate a response.', 'assistant');
+            })
+            .catch(() => {
+                removeTyping(typingEl);
+                appendMessage('Connection error. Please ensure the server is running and the model is loaded.', 'assistant');
+            });
+    }
+
+    function appendMessage(text, role) {
+        const msgEl = document.createElement('div');
+        msgEl.className = `message ${role}`;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'msg-avatar';
+        avatar.innerHTML = role === 'user'
+            ? '<i class="fas fa-user"></i>'
+            : '<i class="fas fa-robot"></i>';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble';
+        bubble.textContent = text;
+
+        msgEl.appendChild(avatar);
+        msgEl.appendChild(bubble);
+        messagesList.appendChild(msgEl);
+        scrollToBottom();
+        return msgEl;
+    }
+
+    function appendTyping() {
+        const msgEl = document.createElement('div');
+        msgEl.className = 'message assistant';
+        msgEl.id = 'typingIndicator';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'msg-avatar';
+        avatar.innerHTML = '<i class="fas fa-robot"></i>';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble';
+        bubble.innerHTML = `
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>`;
+
+        msgEl.appendChild(avatar);
+        msgEl.appendChild(bubble);
+        messagesList.appendChild(msgEl);
+        scrollToBottom();
+        return msgEl;
+    }
+
+    function removeTyping(el) { el?.remove(); }
+
+    function scrollToBottom() {
+        const chatArea = document.getElementById('chatArea');
+        chatArea.scrollTop = chatArea.scrollHeight;
     }
 });

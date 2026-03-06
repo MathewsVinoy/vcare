@@ -1,229 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skin Cancer Detection</title>
+    <title>Skin Cancer Detection — VCare AI</title>
+    <meta name="description"
+        content="Upload a skin lesion image for AI-powered cancer risk analysis using ViT deep learning model.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/image_detection.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
-    <header class="header">
-        <div class="header-content">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
             <div class="logo">
-                <i class="fas fa-comment-dots"></i>
-                <span>VCAN</span>
+                <div class="logo-icon">
+                    <i class="fas fa-heartbeat"></i>
+                </div>
+                <span class="logo-text">VCare <span class="logo-accent">AI</span></span>
             </div>
-            <nav class="nav">
-                <a href="/" class="nav-link">Chat</a>
-                <a href="/blood_sample" class="nav-link">Blood Sample</a>
-                <a href="/image_detection" class="nav-link">Image</a>
-            </nav>
-            <div class="auth-buttons">
-                <button class="btn-login">Log in</button>
-                <button class="btn-signup">Sign up for free</button>
-                <button class="btn-help">
-                    <i class="fas fa-question-circle"></i>
-                </button>
+            <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Tools</div>
+            <a href="/" class="nav-item" id="nav-chat">
+                <div class="nav-item-icon"><i class="fas fa-comment-medical"></i></div>
+                <span>AI Chat</span>
+                <div class="nav-item-badge">Live</div>
+            </a>
+            <a href="/blood_sample" class="nav-item" id="nav-blood">
+                <div class="nav-item-icon"><i class="fas fa-vial"></i></div>
+                <span>Blood Analysis</span>
+            </a>
+            <a href="/image_detection" class="nav-item active" id="nav-image">
+                <div class="nav-item-icon"><i class="fas fa-microscope"></i></div>
+                <span>Skin Detection</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="model-badge">
+                <i class="fas fa-microchip"></i>
+                <span>ViT-B/16 Model</span>
             </div>
         </div>
-    </header>
+    </aside>
 
-    <main class="main-content">
-        <div class="chat-container">
-            <div class="welcome-section">
-                <h1 class="welcome-title">Skin Cancer Detection</h1>
-                <p class="subtitle">Upload a skin lesion image for AI-powered cancer risk analysis</p>
-                
-                <div class="form-container">
-                    <div class="upload-area" id="uploadArea">
-                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                        <div class="upload-text">Click to upload or drag and drop</div>
-                        <div class="upload-subtext">Supported formats: JPG, PNG, JPEG (Max 10MB)</div>
-                        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/jpg">
+    <!-- Main Content -->
+    <div class="app-body" id="appBody">
+        <header class="topbar">
+            <button class="topbar-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="topbar-title">Skin Cancer Detection</div>
+            <div class="topbar-status">
+                <span class="status-dot active"></span>
+                <span class="status-text">Model Ready</span>
+            </div>
+        </header>
+
+        <main class="page-content">
+            <div class="page-header">
+                <div class="page-header-icon">
+                    <i class="fas fa-microscope"></i>
+                </div>
+                <div>
+                    <h1 class="page-title">Skin Cancer Detection</h1>
+                    <p class="page-subtitle">Upload a dermoscopy or clinical image for AI-powered melanoma risk analysis
+                    </p>
+                </div>
+            </div>
+
+            <div class="detection-layout">
+                <!-- Upload Card -->
+                <div class="upload-card" id="uploadCard">
+                    <div class="upload-zone" id="uploadArea">
+                        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/jpg" hidden>
+                        <div class="upload-zone-inner" id="uploadZoneInner">
+                            <div class="upload-zone-icon">
+                                <i class="fas fa-cloud-arrow-up"></i>
+                            </div>
+                            <div class="upload-zone-title">Drop your image here</div>
+                            <div class="upload-zone-sub">or click to browse · JPG, PNG · Max 10 MB</div>
+                            <button type="button" class="btn-upload-browse" id="browseBtn">
+                                <i class="fas fa-folder-open"></i>
+                                Browse Files
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="preview-container" id="previewContainer">
-                        <img id="imagePreview" class="image-preview" alt="Preview">
+                    <!-- Preview -->
+                    <div class="image-preview-wrapper" id="previewWrapper" style="display:none;">
+                        <img id="imagePreview" class="image-preview" alt="Uploaded skin lesion">
+                        <div class="image-preview-overlay">
+                            <button class="preview-action-btn" id="changeImageBtn">
+                                <i class="fas fa-arrow-rotate-left"></i>
+                                Change Image
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="form-actions" id="actionButtons" style="display: none;">
-                        <button type="button" class="btn-predict" id="predictBtn">
+                    <div class="upload-actions" id="uploadActions" style="display:none;">
+                        <button class="btn-primary" id="predictBtn">
                             <i class="fas fa-brain"></i>
                             <span>Analyze Image</span>
                         </button>
-                        <button type="button" class="btn-reset" id="resetBtn">
-                            <i class="fas fa-redo"></i>
-                            <span>Upload New Image</span>
+                        <button class="btn-secondary" id="resetBtn">
+                            <i class="fas fa-rotate-left"></i>
+                            <span>Reset</span>
                         </button>
                     </div>
+                </div>
 
-                    <div id="resultContainer" class="result-container" style="display: none;">
-                        <div class="result-card">
-                            <h2 class="result-title">Analysis Result</h2>
-                            <div id="resultContent" class="result-content"></div>
-                        </div>
+                <!-- Guide Card -->
+                <div class="guide-card">
+                    <div class="guide-header">
+                        <i class="fas fa-circle-info"></i>
+                        <h3>How to get accurate results</h3>
+                    </div>
+                    <ul class="guide-list">
+                        <li>
+                            <div class="guide-icon"><i class="fas fa-camera"></i></div>
+                            <span>Use a clear, well-lit close-up photo of the lesion</span>
+                        </li>
+                        <li>
+                            <div class="guide-icon"><i class="fas fa-expand"></i></div>
+                            <span>The lesion should fill most of the frame</span>
+                        </li>
+                        <li>
+                            <div class="guide-icon"><i class="fas fa-ban"></i></div>
+                            <span>Avoid blurry, shadowy, or rotated images</span>
+                        </li>
+                        <li>
+                            <div class="guide-icon"><i class="fas fa-image"></i></div>
+                            <span>Supported formats: JPEG, PNG (max 10 MB)</span>
+                        </li>
+                    </ul>
+                    <div class="guide-disclaimer">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        This tool is for <strong>screening purposes only</strong>. Always consult a dermatologist for a
+                        confirmed diagnosis.
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
 
+            <!-- Result -->
+            <div id="resultContainer" class="result-panel" style="display:none;"></div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/image_detection.js') }}"></script>
     <script>
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const previewContainer = document.getElementById('previewContainer');
-        const imagePreview = document.getElementById('imagePreview');
-        const actionButtons = document.getElementById('actionButtons');
-        const predictBtn = document.getElementById('predictBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const resultContainer = document.getElementById('resultContainer');
-        const resultContent = document.getElementById('resultContent');
-
-        let selectedFile = null;
-
-        // Click to upload
-        uploadArea.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        // File selection
-        fileInput.addEventListener('change', handleFileSelect);
-
-        // Drag and drop
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragging');
-        });
-
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragging');
-        });
-
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragging');
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                handleFile(file);
-            }
-        });
-
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if (file) {
-                handleFile(file);
-            }
-        }
-
-        function handleFile(file) {
-            selectedFile = file;
-            const reader = new FileReader();
-            
-            reader.onload = (e) => {
-                imagePreview.src = e.target.result;
-                previewContainer.style.display = 'block';
-                actionButtons.style.display = 'flex';
-                uploadArea.style.display = 'none';
-                resultContainer.style.display = 'none';
-            };
-            
-            reader.readAsDataURL(file);
-        }
-
-        // Reset button
-        resetBtn.addEventListener('click', () => {
-            fileInput.value = '';
-            selectedFile = null;
-            previewContainer.style.display = 'none';
-            actionButtons.style.display = 'none';
-            uploadArea.style.display = 'block';
-            resultContainer.style.display = 'none';
-        });
-
-        // Predict button
-        predictBtn.addEventListener('click', async () => {
-            if (!selectedFile) {
-                alert('Please select an image first');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('image', selectedFile);
-
-            try {
-                predictBtn.disabled = true;
-                predictBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Analyzing...</span>';
-
-                const response = await fetch('/predict_skin_cancer', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                displayResults(data);
-            } catch (error) {
-                console.error('Error:', error);
-                // Display mock result for demonstration
-                displayMockResults();
-            } finally {
-                predictBtn.disabled = false;
-                predictBtn.innerHTML = '<i class="fas fa-brain"></i> <span>Analyze Image</span>';
-            }
-        });
-
-        function displayResults(data) {
-            const probability = data.probability || 0;
-            const diagnosis = data.diagnosis || 'Unknown';
-            const description = data.description || '';
-
-            resultContent.innerHTML = `
-                <div class="diagnosis-box">
-                    <div class="diagnosis-label">Diagnosis:</div>
-                    <h3 style="color: #d32f2f; margin: 0.5rem 0;">${diagnosis}</h3>
-                </div>
-
-                <div class="diagnosis-label">Cancer Risk Probability:</div>
-                <div class="probability-bar">
-                    <div class="probability-fill" style="width: ${probability}%">
-                        ${probability.toFixed(2)}%
-                    </div>
-                </div>
-
-                <div style="margin-top: 1.5rem;">
-                    <div class="diagnosis-label">Analysis Details:</div>
-                    <p style="color: #666; line-height: 1.8;">${description}</p>
-                </div>
-
-                <div style="margin-top: 1.5rem; padding: 1rem; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
-                    <strong>⚠️ Important:</strong> This is an AI-powered prediction and should not replace professional medical diagnosis. Please consult with a dermatologist for accurate assessment.
-                </div>
-            `;
-
-            resultContainer.style.display = 'block';
-            resultContainer.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function displayMockResults() {
-            // Mock result for demonstration
-            const mockProbability = Math.random() * 100;
-            const mockDiagnosis = mockProbability > 50 ? 'High Risk - Melanoma Suspected' : 'Low Risk - Benign Lesion';
-            const mockDescription = mockProbability > 50 
-                ? 'The analysis indicates characteristics commonly associated with melanoma, including irregular borders, asymmetry, and color variations. Immediate consultation with a dermatologist is strongly recommended.'
-                : 'The lesion shows characteristics of a benign skin condition. However, regular monitoring and professional evaluation are still recommended as a precautionary measure.';
-
-            displayResults({
-                probability: mockProbability,
-                diagnosis: mockDiagnosis,
-                description: mockDescription
-            });
-        }
+        const sidebar = document.getElementById('sidebar');
+        document.getElementById('sidebarToggle').addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+        document.getElementById('mobileMenuBtn').addEventListener('click', () => sidebar.classList.toggle('open'));
     </script>
 </body>
+
 </html>

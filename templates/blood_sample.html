@@ -1,166 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blood Sample Analysis</title>
+    <title>Blood Analysis — VCare AI</title>
+    <meta name="description" content="AI-powered blood sample analysis for leukemia and cancer risk prediction.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/blood_sample.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
-    <header class="header">
-        <div class="header-content">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
             <div class="logo">
-                <i class="fas fa-comment-dots"></i>
-                <span>VCAN</span>
+                <div class="logo-icon">
+                    <i class="fas fa-heartbeat"></i>
+                </div>
+                <span class="logo-text">VCare <span class="logo-accent">AI</span></span>
             </div>
-            <nav class="nav">
-                <a href="/" class="nav-link">Chat</a>
-                <a href="/blood_sample" class="nav-link">Blood Sample</a>
-                <a href="/image_detection" class="nav-link">Image</a>
-            </nav>
-            <div class="auth-buttons">
-                <button class="btn-login">Log in</button>
-                <button class="btn-signup">Sign up for free</button>
-                <button class="btn-help">
-                    <i class="fas fa-question-circle"></i>
-                </button>
+            <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Tools</div>
+            <a href="/" class="nav-item" id="nav-chat">
+                <div class="nav-item-icon"><i class="fas fa-comment-medical"></i></div>
+                <span>AI Chat</span>
+                <div class="nav-item-badge">Live</div>
+            </a>
+            <a href="/blood_sample" class="nav-item active" id="nav-blood">
+                <div class="nav-item-icon"><i class="fas fa-vial"></i></div>
+                <span>Blood Analysis</span>
+            </a>
+            <a href="/image_detection" class="nav-item" id="nav-image">
+                <div class="nav-item-icon"><i class="fas fa-microscope"></i></div>
+                <span>Skin Detection</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="model-badge">
+                <i class="fas fa-microchip"></i>
+                <span>Random Forest Model</span>
             </div>
         </div>
-    </header>
+    </aside>
 
-    <main class="main-content">
-        <div class="chat-container" style="max-width: 1200px;">
-            <div class="welcome-section">
-                <h1 class="welcome-title">Medical Diagnosis Prediction</h1>
-                <p class="subtitle">Enter patient information for accurate diagnosis prediction</p>
-                
-                <div class="form-container">
-                    <form id="bloodSampleForm">
-                        <!-- Patient Demographics Section -->
-                        <div class="form-section">
-                            <h2 class="section-title">Patient Demographics</h2>
-                            <div class="form-grid grid-3">
-                                <div class="form-group">
-                                    <label for="age">
-                                        Age <i class="fas fa-info-circle info-icon" title="Patient's age in years"></i>
-                                    </label>
-                                    <input type="number" id="age" name="age" placeholder="11" required>
-                                </div>
+    <!-- Main Content -->
+    <div class="app-body" id="appBody">
+        <header class="topbar">
+            <button class="topbar-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="topbar-title">Blood Analysis</div>
+            <div class="topbar-status">
+                <span class="status-dot active"></span>
+                <span class="status-text">Model Ready</span>
+            </div>
+        </header>
 
-                                <div class="form-group">
-                                    <label for="gender">Gender</label>
-                                    <select id="gender" name="gender" required>
-                                        <option value="">Select gender</option>
-                                        <option value="0">Male</option>
-                                        <option value="1">Female</option>
-                                    </select>
-                                </div>
+        <main class="page-content">
+            <div class="page-header">
+                <div class="page-header-icon">
+                    <i class="fas fa-vial"></i>
+                </div>
+                <div>
+                    <h1 class="page-title">Blood Sample Analysis</h1>
+                    <p class="page-subtitle">Enter patient blood test results for AI-powered leukemia risk prediction
+                    </p>
+                </div>
+            </div>
 
-                                <div class="form-group">
-                                    <label for="bmi">BMI (Body Mass Index) <span class="range-hint">(18.5-24.9 normal)</span></label>
-                                    <input type="number" step="0.01" id="bmi" name="bmi" placeholder="22221" required>
-                                </div>
-                            </div>
+            <form id="bloodSampleForm" class="analysis-form">
+                <!-- Patient Demographics -->
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <div class="form-card-icon"><i class="fas fa-user-injured"></i></div>
+                        <h2 class="form-card-title">Patient Demographics</h2>
+                    </div>
+                    <div class="form-grid grid-3">
+                        <div class="form-group">
+                            <label for="age">Age <span class="label-unit">(years)</span></label>
+                            <input type="number" id="age" name="age" placeholder="e.g. 35" min="1" max="120" required>
                         </div>
-
-                        <!-- Blood Test Results Section -->
-                        <div class="form-section">
-                            <h2 class="section-title">Blood Test Results</h2>
-                            <div class="form-grid grid-3">
-                                <div class="form-group">
-                                    <label for="wbc_count">WBC Count (cells/µL) <span class="range-hint">(4,000-11,000)</span></label>
-                                    <input type="number" step="0.01" id="wbc_count" name="wbc_count" placeholder="1111" required>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="rbc_count">RBC Count (million cells/µL) <span class="range-hint">(4.5-5.5)</span></label>
-                                    <input type="number" step="0.01" id="rbc_count" name="rbc_count" placeholder="2222" required>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="platelet_count">Platelet Count (cells/µL) <span class="range-hint">(150,000-400,000)</span></label>
-                                    <input type="number" step="0.01" id="platelet_count" name="platelet_count" placeholder="222" required>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="hemoglobin_level">Hemoglobin Level (g/dL) <span class="range-hint">(12-16)</span></label>
-                                    <input type="number" step="0.01" id="hemoglobin_level" name="hemoglobin_level" placeholder="22" required>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="bone_marrow_blasts">Bone Marrow Blasts (%) <span class="range-hint">(0-5% normal)</span></label>
-                                    <input type="number" step="0.01" id="bone_marrow_blasts" name="bone_marrow_blasts" placeholder="22" required>
-                                </div>
-                            </div>
+                        <div class="form-group">
+                            <label for="gender">Gender</label>
+                            <select id="gender" name="gender" required>
+                                <option value="">Select gender</option>
+                                <option value="0">Male</option>
+                                <option value="1">Female</option>
+                            </select>
                         </div>
-
-                        <!-- Medical History & Risk Factors Section -->
-                        <div class="form-section">
-                            <h2 class="section-title">Medical History & Risk Factors</h2>
-                            <div class="form-grid grid-3">
-                                <div class="form-group">
-                                    <label for="family_history">Family History</label>
-                                    <select id="family_history" name="family_history" required>
-                                        <option value="">Select option</option>
-                                        <option value="0">No</option>
-                                        <option value="1">Yes</option>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="smoking_status">Smoking Status</label>
-                                    <select id="smoking_status" name="smoking_status" required>
-                                        <option value="">Select option</option>
-                                        <option value="0">Non-smoker</option>
-                                        <option value="1">Smoker</option>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="radiation_exposure">Radiation Exposure</label>
-                                    <select id="radiation_exposure" name="radiation_exposure" required>
-                                        <option value="">Select option</option>
-                                        <option value="0">No</option>
-                                        <option value="1">Yes</option>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="infection_history">Infection History</label>
-                                    <select id="infection_history" name="infection_history" required>
-                                        <option value="">Select option</option>
-                                        <option value="0">No</option>
-                                        <option value="1">Yes</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-actions">
-                            <button type="submit" class="btn-predict">
-                                <i class="fas fa-stethoscope"></i>
-                                <span>Predict Diagnosis</span>
-                            </button>
-                            <button type="reset" class="btn-reset">
-                                <i class="fas fa-redo"></i>
-                                <span>Reset Form</span>
-                            </button>
-                        </div>
-                    </form>
-
-                    <div id="resultContainer" class="result-container" style="display: none;">
-                        <div class="result-card">
-                            <h2 class="result-title">Prediction Result</h2>
-                            <div id="resultContent" class="result-content"></div>
+                        <div class="form-group">
+                            <label for="bmi">BMI <span class="label-unit">(18.5–24.9 normal)</span></label>
+                            <input type="number" step="0.01" id="bmi" name="bmi" placeholder="e.g. 22.5" min="10"
+                                max="60" required>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </main>
+
+                <!-- Blood Test Results -->
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <div class="form-card-icon"><i class="fas fa-tint"></i></div>
+                        <h2 class="form-card-title">Blood Test Results</h2>
+                    </div>
+                    <div class="form-grid grid-3">
+                        <div class="form-group">
+                            <label for="wbc_count">WBC Count <span class="label-unit">(cells/µL · 4k–11k)</span></label>
+                            <input type="number" step="0.01" id="wbc_count" name="wbc_count" placeholder="e.g. 7500"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label for="rbc_count">RBC Count <span class="label-unit">(M cells/µL ·
+                                    4.5–5.5)</span></label>
+                            <input type="number" step="0.01" id="rbc_count" name="rbc_count" placeholder="e.g. 5.0"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label for="platelet_count">Platelet Count <span class="label-unit">(cells/µL ·
+                                    150k–400k)</span></label>
+                            <input type="number" step="0.01" id="platelet_count" name="platelet_count"
+                                placeholder="e.g. 275000" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="hemoglobin_level">Hemoglobin <span class="label-unit">(g/dL ·
+                                    12–16)</span></label>
+                            <input type="number" step="0.01" id="hemoglobin_level" name="hemoglobin_level"
+                                placeholder="e.g. 14.2" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="bone_marrow_blasts">Bone Marrow Blasts <span class="label-unit">(% · 0–5
+                                    normal)</span></label>
+                            <input type="number" step="0.01" id="bone_marrow_blasts" name="bone_marrow_blasts"
+                                placeholder="e.g. 2.1" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medical History -->
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <div class="form-card-icon"><i class="fas fa-notes-medical"></i></div>
+                        <h2 class="form-card-title">Medical History & Risk Factors</h2>
+                    </div>
+                    <div class="form-grid grid-4">
+                        <div class="form-group">
+                            <label for="family_history">Family History</label>
+                            <select id="family_history" name="family_history" required>
+                                <option value="">Select</option>
+                                <option value="0">No history</option>
+                                <option value="1">Yes — family history</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="smoking_status">Smoking Status</label>
+                            <select id="smoking_status" name="smoking_status" required>
+                                <option value="">Select</option>
+                                <option value="0">Non-smoker</option>
+                                <option value="1">Smoker</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="radiation_exposure">Radiation Exposure</label>
+                            <select id="radiation_exposure" name="radiation_exposure" required>
+                                <option value="">Select</option>
+                                <option value="0">No exposure</option>
+                                <option value="1">Yes — exposed</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="infection_history">Infection History</label>
+                            <select id="infection_history" name="infection_history" required>
+                                <option value="">Select</option>
+                                <option value="0">No history</option>
+                                <option value="1">Yes — prior infections</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="predictBtn">
+                        <i class="fas fa-stethoscope"></i>
+                        <span>Run Prediction</span>
+                    </button>
+                    <button type="reset" class="btn-secondary" id="resetBtn">
+                        <i class="fas fa-rotate-left"></i>
+                        <span>Clear Form</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Result -->
+            <div id="resultContainer" class="result-panel" style="display:none;"></div>
+        </main>
+    </div>
 
     <script src="{{ url_for('static', filename='js/blood_sample.js') }}"></script>
+    <script>
+        // Sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        document.getElementById('sidebarToggle').addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+        document.getElementById('mobileMenuBtn').addEventListener('click', () => sidebar.classList.toggle('open'));
+    </script>
 </body>
+
 </html>

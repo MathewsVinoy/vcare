@@ -1,145 +1,127 @@
-document.addEventListener('DOMContentLoaded', function() {
+/* VCare AI — Blood Sample Analysis Script */
+
+document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('bloodSampleForm');
-    const resultContainer = document.getElementById('resultContainer');
-    const resultContent = document.getElementById('resultContent');
+    const predictBtn = document.getElementById('predictBtn');
+    const resultEl = document.getElementById('resultContainer');
 
-    form.addEventListener('submit', async function(e) {
+    // Sidebar
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => sidebar.classList.toggle('open'));
+
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        setLoading(true);
 
-        // Get form data
-        const formData = {
-            age: parseFloat(document.getElementById('age').value),
-            gender: parseInt(document.getElementById('gender').value),
-            wbc_count: parseFloat(document.getElementById('wbc_count').value),
-            rbc_count: parseFloat(document.getElementById('rbc_count').value),
-            platelet_count: parseFloat(document.getElementById('platelet_count').value),
-            hemoglobin_level: parseFloat(document.getElementById('hemoglobin_level').value),
-            bone_marrow_blasts: parseFloat(document.getElementById('bone_marrow_blasts').value),
-            family_history: parseInt(document.getElementById('family_history').value),
-            smoking_status: parseInt(document.getElementById('smoking_status').value),
-            radiation_exposure: parseInt(document.getElementById('radiation_exposure').value),
-            bmi: parseFloat(document.getElementById('bmi').value),
-            infection_history: parseInt(document.getElementById('infection_history').value)
+        const data = {
+            age: form.age.value,
+            gender: form.gender.value,
+            bmi: form.bmi.value,
+            wbc_count: form.wbc_count.value,
+            rbc_count: form.rbc_count.value,
+            platelet_count: form.platelet_count.value,
+            hemoglobin_level: form.hemoglobin_level.value,
+            bone_marrow_blasts: form.bone_marrow_blasts.value,
+            family_history: form.family_history.value,
+            smoking_status: form.smoking_status.value,
+            radiation_exposure: form.radiation_exposure.value,
+            infection_history: form.infection_history.value,
         };
 
         try {
-            // Show loading state
-            resultContent.innerHTML = `
-                <div style="text-align: center; padding: 2rem;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #d32f2f;"></i>
-                    <p style="margin-top: 1rem; color: #666;">Analyzing blood sample data...</p>
-                </div>
-            `;
-            resultContainer.style.display = 'block';
-
-            // Send data to server
-            const response = await fetch('/predict_blood_sample', {
+            const res = await fetch('/predict_blood_sample', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
             });
 
-            const result = await response.json();
+            const result = await res.json();
+            if (!res.ok || !result.success) throw new Error(result.error || 'Prediction failed');
+            showResult(result);
 
-            if (response.ok) {
-                // Display prediction result
-                displayResult(result);
-            } else {
-                throw new Error(result.error || 'Prediction failed');
-            }
-        } catch (error) {
-            resultContent.innerHTML = `
-                <div style="text-align: center; padding: 2rem;">
-                    <i class="fas fa-exclamation-circle" style="font-size: 2rem; color: #d32f2f;"></i>
-                    <p style="margin-top: 1rem; color: #d32f2f; font-weight: 600;">Error: ${error.message}</p>
-                    <p style="margin-top: 0.5rem; color: #666;">Please try again or contact support.</p>
-                </div>
-            `;
+        } catch (err) {
+            showError(err.message);
+        } finally {
+            setLoading(false);
         }
     });
 
-    function displayResult(result) {
-        const prediction = result.prediction;
-        const probability = result.probability ? (result.probability * 100).toFixed(2) : null;
-        const isLeukemia = result.raw_prediction === 1;
+    function setLoading(on) {
+        predictBtn.disabled = on;
+        predictBtn.innerHTML = on
+            ? '<i class="fas fa-spinner"></i><span>Analyzing…</span>'
+            : '<i class="fas fa-stethoscope"></i><span>Run Prediction</span>';
+        if (on) predictBtn.classList.add('loading');
+        else predictBtn.classList.remove('loading');
+    }
 
-        let resultHTML = `
-            <div style="text-align: center;">
-                <div style="display: inline-block; padding: 1rem 2rem; background: white; border-radius: 12px; border: 2px solid ${isLeukemia ? '#d32f2f' : '#4caf50'}; margin-bottom: 1rem;">
-                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 0.5rem;">Diagnosis Prediction</p>
-                    <p style="font-size: 1.5rem; font-weight: 700; color: ${isLeukemia ? '#d32f2f' : '#4caf50'}; margin: 0;">${prediction}</p>
-                </div>
-        `;
+    function showResult(data) {
+        const isPositive = data.raw_prediction === 1;
+        const prob = data.probability !== null ? (data.probability * 100).toFixed(1) : null;
+        const confidence = prob !== null ? `${prob}%` : 'N/A';
+        const riskClass = isPositive ? 'high' : 'low';
+        const riskIcon = isPositive ? 'fa-circle-exclamation' : 'fa-circle-check';
 
-        if (probability) {
-            resultHTML += `
-                <div style="margin-top: 1rem;">
-                    <p style="color: #666;">Confidence Level</p>
-                    <div style="background: #ffebee; border-radius: 20px; height: 30px; overflow: hidden; margin-top: 0.5rem;">
-                        <div style="background: linear-gradient(90deg, ${isLeukemia ? '#d32f2f, #b71c1c' : '#4caf50, #388e3c'}); height: 100%; width: ${probability}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.9rem; transition: width 1s ease;">
-                            ${probability}%
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+        resultEl.innerHTML = `
+            <div class="result-panel-title">
+                <i class="fas fa-chart-bar"></i>
+                Prediction Result
+            </div>
 
-        // Add doctor consultation message based on result
-        if (isLeukemia) {
-            resultHTML += `
-                </div>
-                <div style="margin-top: 2rem; padding: 1.5rem; background: #ffebee; border-radius: 12px; border-left: 4px solid #d32f2f;">
-                    <div style="display: flex; align-items: start; gap: 1rem;">
-                        <i class="fas fa-exclamation-triangle" style="color: #d32f2f; font-size: 2rem; margin-top: 0.25rem;"></i>
-                        <div style="text-align: left;">
-                            <h3 style="color: #d32f2f; margin: 0 0 0.75rem 0; font-size: 1.2rem;"><i class="fas fa-hospital"></i> Important: Immediate Medical Attention Required</h3>
-                            <p style="color: #333; font-size: 1rem; line-height: 1.8; margin: 0 0 0.75rem 0;">
-                                Based on the analysis, indicators suggest possible leukemia. <strong style="color: #d32f2f;">Please consult with a healthcare professional or oncologist as soon as possible.</strong>
-                            </p>
-                            <p style="color: #666; font-size: 0.95rem; line-height: 1.6; margin: 0;">
-                                Early detection and prompt medical intervention are crucial for better treatment outcomes. Schedule an appointment with your doctor immediately for proper diagnosis and treatment planning.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else {
-            resultHTML += `
-                </div>
-                <div style="margin-top: 2rem; padding: 1.5rem; background: #e8f5e9; border-radius: 12px; border-left: 4px solid #4caf50;">
-                    <div style="display: flex; align-items: start; gap: 1rem;">
-                        <i class="fas fa-check-circle" style="color: #4caf50; font-size: 2rem; margin-top: 0.25rem;"></i>
-                        <div style="text-align: left;">
-                            <h3 style="color: #2e7d32; margin: 0 0 0.75rem 0; font-size: 1.2rem;"><i class="fas fa-heart"></i> Good News: No Leukemia Detected</h3>
-                            <p style="color: #333; font-size: 1rem; line-height: 1.8; margin: 0 0 0.75rem 0;">
-                                The analysis shows no indicators of leukemia. However, <strong style="color: #2e7d32;">it is still recommended to consult with your doctor for a comprehensive health checkup.</strong>
-                            </p>
-                            <p style="color: #666; font-size: 0.95rem; line-height: 1.6; margin: 0;">
-                                Regular medical checkups are important for maintaining good health and early detection of any potential health issues. Please schedule a routine visit with your healthcare provider.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+            <div class="risk-badge ${riskClass}">
+                <i class="fas ${riskIcon}"></i>
+                ${data.prediction}
+            </div>
 
-        resultHTML += `
-            <div style="margin-top: 1.5rem; padding: 1rem; background: white; border-radius: 12px; border: 2px solid #ffcdd2;">
-                <p style="color: #666; font-size: 0.9rem; line-height: 1.6; margin: 0;">
-                    <strong style="color: #d32f2f;">Disclaimer:</strong> This prediction is based on machine learning analysis and should not replace professional medical diagnosis. Always consult with qualified healthcare professionals for accurate diagnosis and treatment.
-                </p>
+            ${prob !== null ? `
+            <div class="prob-bar-wrapper">
+                <div class="prob-bar-label">
+                    <span>Confidence Score</span>
+                    <span>${confidence}</span>
+                </div>
+                <div class="prob-bar-track">
+                    <div class="prob-bar-fill" id="probFill" style="width: 0%"></div>
+                </div>
+            </div>
+            ` : ''}
+
+            <div class="result-description">
+                ${isPositive
+                ? 'The model detected indicators consistent with <strong>leukemia risk</strong>. Elevated bone marrow blast percentages, abnormal blood cell counts, or combination of risk factors may have contributed to this prediction.'
+                : 'The blood sample parameters fall within <strong>normal or low-risk ranges</strong>. No strong indicators of leukemia were detected based on the provided data.'}
+            </div>
+
+            <div class="result-disclaimer">
+                <i class="fas fa-triangle-exclamation"></i>
+                This prediction is generated by an AI model and is intended for <strong>informational purposes only</strong>. Please consult a licensed hematologist or oncologist for clinical diagnosis and treatment.
             </div>
         `;
 
-        resultContent.innerHTML = resultHTML;
-        resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        resultEl.style.display = 'block';
+
+        // Animate confidence bar
+        if (prob !== null) {
+            setTimeout(() => {
+                const fill = document.getElementById('probFill');
+                if (fill) fill.style.width = confidence;
+            }, 80);
+        }
+
+        resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Reset button handler
-    form.addEventListener('reset', function() {
-        resultContainer.style.display = 'none';
-        resultContent.innerHTML = '';
-    });
+    function showError(msg) {
+        resultEl.innerHTML = `
+            <div class="result-panel-title">
+                <i class="fas fa-xmark-circle" style="color: var(--red-400)"></i>
+                Error
+            </div>
+            <div class="result-description" style="border-left-color: var(--red-600);">
+                ${msg}
+            </div>
+        `;
+        resultEl.style.display = 'block';
+        resultEl.scrollIntoView({ behavior: 'smooth' });
+    }
 });
