@@ -6,20 +6,41 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-    background: linear-gradient(135deg, #ffffff 0%, #ffebee 100%);
+    background: linear-gradient(135deg, #fef5f5 0%, #ffe3e8 50%, #ffd4db 100%);
+    background-attachment: fixed;
     min-height: 100vh;
     color: #333;
+    position: relative;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(255, 193, 203, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(255, 138, 159, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(255, 241, 243, 0.2) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
 }
 
 /* Header Styles */
 .header {
-    background: #ffffff;
-    border-bottom: 1px solid #ffcdd2;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 205, 210, 0.5);
     padding: 0.875rem 2rem;
     position: sticky;
     top: 0;
     z-index: 100;
-    box-shadow: 0 2px 12px rgba(211, 47, 47, 0.08);
+    box-shadow: 0 4px 24px rgba(211, 47, 47, 0.08), 0 2px 8px rgba(255, 138, 159, 0.06);
+    transition: all 0.3s ease;
 }
 
 .header-content {
@@ -39,10 +60,32 @@ body {
     font-weight: 700;
     color: #d32f2f;
     white-space: nowrap;
+    background: linear-gradient(135deg, #d32f2f 0%, #f44336 50%, #ff5252 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 2px 8px rgba(211, 47, 47, 0.15);
+    transition: transform 0.3s ease;
+}
+
+.logo:hover {
+    transform: scale(1.05);
 }
 
 .logo i {
     font-size: 1.6rem;
+    color: #d32f2f;
+    filter: drop-shadow(0 2px 4px rgba(211, 47, 47, 0.2));
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
 }
 
 .nav {
@@ -56,24 +99,27 @@ body {
     text-decoration: none;
     color: #333;
     font-size: 0.95rem;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     font-weight: 500;
     position: relative;
+    padding: 0.5rem 0.25rem;
 }
 
 .nav-link::after {
     content: '';
     position: absolute;
-    bottom: -4px;
+    bottom: 0;
     left: 0;
     width: 0;
-    height: 2px;
-    background: #d32f2f;
-    transition: width 0.3s ease;
+    height: 3px;
+    background: linear-gradient(90deg, #d32f2f 0%, #f44336 100%);
+    transition: width 0.4s ease;
+    border-radius: 2px;
 }
 
 .nav-link:hover {
     color: #d32f2f;
+    transform: translateY(-2px);
 }
 
 .nav-link:hover::after {
@@ -95,35 +141,73 @@ body {
     cursor: pointer;
     color: #d32f2f;
     font-weight: 600;
-    border-radius: 10px;
+    border-radius: 12px;
     transition: all 0.3s ease;
     white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-login::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(211, 47, 47, 0.1);
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+}
+
+.btn-login:hover::before {
+    width: 300px;
+    height: 300px;
 }
 
 .btn-login:hover {
     background: #ffebee;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.15);
+    box-shadow: 0 6px 16px rgba(211, 47, 47, 0.2);
 }
 
 .btn-signup {
-    background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+    background: linear-gradient(135deg, #d32f2f 0%, #c62828 50%, #b71c1c 100%);
     color: white;
     border: none;
     padding: 0.5rem 1.5rem;
     font-size: 0.95rem;
     cursor: pointer;
-    border-radius: 10px;
+    border-radius: 12px;
     font-weight: 600;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(211, 47, 47, 0.25);
+    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.3);
     white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-signup::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transform: rotate(45deg);
+    transition: all 0.5s;
+}
+
+.btn-signup:hover::after {
+    left: 100%;
 }
 
 .btn-signup:hover {
-    background: linear-gradient(135deg, #c62828 0%, #a31515 100%);
+    background: linear-gradient(135deg, #c62828 0%, #b71c1c 50%, #a31515 100%);
     transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(211, 47, 47, 0.35);
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.45);
 }
 
 .btn-help {
@@ -181,9 +265,25 @@ body {
 .welcome-title {
     font-size: 2.5rem;
     font-weight: 600;
-    color: #d32f2f;
+    background: linear-gradient(135deg, #d32f2f 0%, #f44336 50%, #ff5252 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     margin-bottom: 0;
     text-align: center;
+    letter-spacing: -0.5px;
+    animation: fadeInDown 0.6s ease-out;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Messages Container */
@@ -202,17 +302,17 @@ body {
 
 .message {
     margin-bottom: 1.5rem;
-    animation: fadeIn 0.3s ease-in;
+    animation: fadeInSlide 0.5s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes fadeInSlide {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(20px) scale(0.95);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -227,12 +327,19 @@ body {
 }
 
 .message.user .message-content {
-    background: #ffebee;
+    background: linear-gradient(135deg, #ffebee 0%, #fff5f5 100%);
     color: #333;
     padding: 1rem 1.5rem;
-    border-radius: 18px;
-    border: 1px solid #ffcdd2;
+    border-radius: 20px 20px 4px 20px;
+    border: 2px solid rgba(255, 205, 210, 0.5);
     max-width: 70%;
+    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.12);
+    transition: all 0.3s ease;
+}
+
+.message.user .message-content:hover {
+    box-shadow: 0 6px 16px rgba(211, 47, 47, 0.18);
+    transform: translateY(-2px);
 }
 
 .message.assistant .message-content {
@@ -240,6 +347,16 @@ body {
     color: #333;
     padding: 0.5rem 0;
     line-height: 1.6;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .greeting {
@@ -251,15 +368,23 @@ body {
 
 /* Input Container */
 .input-container {
-    background: white;
-    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 28px;
     padding: 1rem;
-    box-shadow: 0 4px 20px rgba(211, 47, 47, 0.15);
-    border: 2px solid #ffcdd2;
+    box-shadow: 0 8px 32px rgba(211, 47, 47, 0.15), 0 4px 16px rgba(255, 138, 159, 0.1);
+    border: 2px solid rgba(255, 205, 210, 0.6);
     margin: 1rem auto;
     max-width: 800px;
     width: calc(100% - 2rem);
     flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+.input-container:hover {
+    box-shadow: 0 12px 40px rgba(211, 47, 47, 0.2), 0 6px 20px rgba(255, 138, 159, 0.15);
+    border-color: rgba(255, 205, 210, 0.8);
 }
 
 .input-wrapper {
@@ -279,14 +404,20 @@ body {
     padding: 0.5rem;
     color: #333;
     background: transparent;
+    transition: all 0.3s ease;
+}
+
+.chat-input:focus {
+    transform: translateY(-1px);
 }
 
 .chat-input::placeholder {
     color: #999;
+    font-style: italic;
 }
 
 .send-btn {
-    background: #d32f2f;
+    background: linear-gradient(135deg, #d32f2f 0%, #f44336 100%);
     color: white;
     border: none;
     padding: 0.75rem;
@@ -297,15 +428,35 @@ body {
     justify-content: center;
     font-size: 1.1rem;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(211, 47, 47, 0.3);
+    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.35);
     width: 42px;
     height: 42px;
+    position: relative;
+    overflow: hidden;
+}
+
+.send-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+}
+
+.send-btn:hover::before {
+    width: 100px;
+    height: 100px;
 }
 
 .send-btn:hover {
-    background: #b71c1c;
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.4);
+    background: linear-gradient(135deg, #c62828 0%, #e53935 100%);
+    transform: scale(1.08);
+    box-shadow: 0 6px 16px rgba(211, 47, 47, 0.5);
 }
 
 .send-btn:active {
@@ -329,10 +480,10 @@ body {
 }
 
 .action-btn {
-    background: #ffebee;
-    border: 1px solid #ffcdd2;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffebee 100%);
+    border: 2px solid rgba(255, 205, 210, 0.6);
     padding: 0.5rem 1rem;
-    border-radius: 16px;
+    border-radius: 18px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -340,17 +491,44 @@ body {
     font-size: 0.9rem;
     color: #c62828;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    transition: left 0.5s;
+}
+
+.action-btn:hover::before {
+    left: 100%;
 }
 
 .action-btn:hover {
-    background: #ffcdd2;
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
     border-color: #ef9a9a;
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(211, 47, 47, 0.2);
 }
 
 .action-btn i {
     font-size: 1rem;
+    background: linear-gradient(135deg, #d32f2f 0%, #f44336 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover i {
+    transform: scale(1.1) rotate(5deg);
 }
 
 .action-btn-small {
@@ -611,22 +789,44 @@ body {
 }
 
 /* Scrollbar Styling */
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: linear-gradient(135deg, #ffebee 0%, #fff5f5 100%);
+    border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #ffcdd2 0%, #ef9a9a 100%);
+    border-radius: 10px;
+    border: 2px solid #ffebee;
+    transition: all 0.3s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #ef9a9a 0%, #e57373 100%);
+    border-color: #ffcdd2;
+}
+
 .messages-container::-webkit-scrollbar {
     width: 8px;
 }
 
 .messages-container::-webkit-scrollbar-track {
-    background: #ffebee;
+    background: linear-gradient(135deg, rgba(255, 235, 238, 0.5) 0%, rgba(255, 245, 245, 0.5) 100%);
     border-radius: 10px;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-    background: #ffcdd2;
+    background: linear-gradient(135deg, #ffcdd2 0%, #ef9a9a 100%);
     border-radius: 10px;
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-    background: #ef9a9a;
+    background: linear-gradient(135deg, #ef9a9a 0%, #e57373 100%);
 }
 
 /* Blood Sample Form Styles */
