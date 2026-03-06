@@ -97,6 +97,10 @@ def load_model():
         trust_remote_code=False
     )
     
+    # Ensure offload directory exists
+    offload_dir = os.path.join(os.path.dirname(__file__), "offload_dir")
+    os.makedirs(offload_dir, exist_ok=True)
+    
     # Load base model
     base_model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -104,14 +108,17 @@ def load_model():
         trust_remote_code=False,
         cache_dir=cache_dir,
         attn_implementation="eager",
-        low_cpu_mem_usage=True
+        low_cpu_mem_usage=True,
+        device_map="auto",
+        offload_folder=offload_dir
     )
     
     # Load LoRA adapter weights on top of base model
     model = PeftModel.from_pretrained(
         base_model,
         lora_adapter_path,
-        device_map="auto"
+        device_map="auto",
+        offload_folder=offload_dir
     )
     
     print(f"Fine-tuned model loaded successfully on device: {model.device}")
@@ -321,4 +328,4 @@ if __name__ == '__main__':
     load_model()
     
     # Run the Flask app
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
