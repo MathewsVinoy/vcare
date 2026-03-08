@@ -277,3 +277,4 @@ model/
 phi3_lora_model/
 model_cache/
 offload_dir/
+phi3_lora_model.zip

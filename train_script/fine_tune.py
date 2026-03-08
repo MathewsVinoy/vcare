@@ -1,4 +1,7 @@
 import json
+import os
+import sys
+import traceback
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple
 
@@ -102,7 +105,7 @@ def load_dataset(path: str) -> list[dict[str, str]]:
 
 
 # Fixed dataset path - it's in a subdirectory
-dataset_path = "data/medical_meadow_wikidoc/medical_meadow_wikidoc.json"
+dataset_path = "data/medical_meadow_wikidoc.json"
 
 if not Path(dataset_path).exists():
     raise FileNotFoundError(f"Dataset not found at: {dataset_path}")
@@ -138,9 +141,15 @@ def run_training(use_gpu: bool) -> None:
     gradient_accumulation_steps = 16 if use_gpu else 8
     optim = "adamw_8bit" if use_gpu else "adamw_torch"
 
+    # ── Output & offload directories (defined early so bnb_config can use them) ──
+    output_dir = f"outputs_{label.lower()}"
+    offload_dir = os.path.join(output_dir, "offload")
+    os.makedirs(offload_dir, exist_ok=True)
+
     # ── Model & tokenizer ────────────────────────────────────
-    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
-    max_seq_length = 1024
+    # Phi-2 (2.7B) fits in 4 GB VRAM at 4-bit; Mistral-7B (7B) does not.
+    model_name = "microsoft/phi-2"
+    max_seq_length = 512  # lower = less activation memory during training
 
     use_4bit = False
     bnb_config = None
@@ -152,8 +161,21 @@ def run_training(use_gpu: bool) -> None:
             bnb_4bit_quant_type="nf4",
             bnb_4bit_compute_dtype=torch.bfloat16 if cuda_bf16 else torch.float16,
             bnb_4bit_use_double_quant=True,
+            # Allow FP32 fallback for modules dispatched to CPU
+            llm_int8_enable_fp32_cpu_offload=True,
         )
-        print("Using 4-bit quantization")
+        print("Using 4-bit quantization with CPU-offload support")
+
+    # Build a max_memory dict so device_map="auto" respects GPU limits
+    # and can spill the remainder to CPU instead of raising an error.
+    if use_gpu:
+        gpu_total = torch.cuda.get_device_properties(0).total_memory
+        # Reserve ~10 % for activations / overhead
+        gpu_budget = int(gpu_total * 0.90)
+        max_memory = {0: gpu_budget, "cpu": "24GiB"}
+        print(f"GPU budget : {gpu_budget / 1024**3:.1f} GiB  |  CPU budget : 24 GiB")
+    else:
+        max_memory = None
 
     print(f"Loading tokenizer: {model_name}")
     tokenizer = AutoTokenizer.from_pretrained(
@@ -168,6 +190,8 @@ def run_training(use_gpu: bool) -> None:
         torch_dtype=(torch.bfloat16 if cuda_bf16 else torch.float16) if use_gpu else torch.float32,
         quantization_config=bnb_config,
         device_map=device_map,
+        max_memory=max_memory,
+        offload_folder=offload_dir,
         trust_remote_code=True,
     )
 
@@ -189,15 +213,13 @@ def run_training(use_gpu: bool) -> None:
 
     # ── LoRA ─────────────────────────────────────────────────
     lora_config = LoraConfig(
-        r=64,
-        lora_alpha=128,
-        lora_dropout=0.0,
+        r=16,           # 64 was too memory-hungry for a 4 GB GPU
+        lora_alpha=32,
+        lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-        ],
+        # Phi-2 attention / MLP projection names
+        target_modules=["q_proj", "k_proj", "v_proj", "dense", "fc1", "fc2"],
     )
 
     model = get_peft_model(model, lora_config)
@@ -211,7 +233,6 @@ def run_training(use_gpu: bool) -> None:
     print("Gradient checkpointing enabled")
 
     # ── Training arguments ───────────────────────────────────
-    output_dir = f"outputs_{label.lower()}"
     print("Setting up training arguments...")
     training_args = TrainingArguments(
         output_dir=output_dir,
@@ -293,11 +314,21 @@ def run_training(use_gpu: bool) -> None:
 
 
 # -----------------------
-# Run on both devices
+# Run training
 # -----------------------
 if torch.cuda.is_available():
-    run_training(use_gpu=True)
+    print(f"CUDA available: {torch.cuda.get_device_name(0)}")
+    print(f"GPU memory    : {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GiB")
+    try:
+        run_training(use_gpu=True)
+    except Exception:
+        print("\n[ERROR] GPU training failed with the following traceback:")
+        traceback.print_exc()
+        sys.exit(1)
 else:
-    print("No GPU detected — skipping GPU training run.")
+    print("No CUDA-capable GPU detected.")
+    print("Mistral-7B is too large to train on CPU — exiting.")
+    print("Install CUDA drivers or use a GPU-enabled environment.")
+    sys.exit(1)
 
-run_training(use_gpu=False)
+print("\nAll done.")
