@@ -48,7 +48,8 @@ def load_model():
 
     model_loading = True
     print(f"\n🔄  Loading {MODEL_NAME} …  (device: {device})\n")
-    os.makedirs(CACHE_DIR, exist_ok=True)
+    OFFLOAD_DIR  = os.path.join(BASE_DIR, "offload_dir")
+    os.makedirs(OFFLOAD_DIR, exist_ok=True)
 
     try:
         torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -61,19 +62,20 @@ def load_model():
 
         llm = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
-            torch_dtype=torch_dtype,
             device_map="auto",
+            load_in_4bit=True,             # 4-bit quantization to save RAM
             cache_dir=CACHE_DIR,
             low_cpu_mem_usage=True,
             trust_remote_code=True,
             attn_implementation="eager",   # avoids flash-attn / sdpa dependency
+            offload_folder=OFFLOAD_DIR,
         )
 
         pipe = pipeline(
             "text-generation",
             model=llm,
             tokenizer=tokenizer,
-            torch_dtype=torch_dtype,
+            # dtype=torch_dtype,  # pipeline also accepts dtype but often infers it from model
             device_map="auto",
         )
 
