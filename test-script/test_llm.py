@@ -23,7 +23,7 @@ app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 # ---------------------------------------------------------------------------
 # Model configuration
 # ---------------------------------------------------------------------------
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+MODEL_NAME = "microsoft/Phi-3-mini-4k-instruct"
 
 device         = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 tokenizer      = None
