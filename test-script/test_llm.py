@@ -1,5 +1,5 @@
 """
-VCare AI — Flask chat server powered by Mistral-7B-Instruct
+VCare AI — Flask chat server powered by Phi-3-mini-4k-instruct
 Run:  python test-script/test_llm.py
 """
 
@@ -53,7 +53,7 @@ def load_model():
         tokenizer = AutoTokenizer.from_pretrained(
             MODEL_NAME,
             cache_dir=CACHE_DIR,
-            trust_remote_code=False,
+            trust_remote_code=True,
         )
 
         llm = AutoModelForCausalLM.from_pretrained(
@@ -62,6 +62,7 @@ def load_model():
             device_map="auto",
             cache_dir=CACHE_DIR,
             low_cpu_mem_usage=True,
+            trust_remote_code=True,
         )
 
         pipe = pipeline(
@@ -72,7 +73,7 @@ def load_model():
 
         model_loaded  = True
         model_loading = False
-        print("✅  Mistral-7B loaded successfully!\n")
+        print("✅  Phi-3-mini-4k-instruct loaded successfully!\n")
 
     except Exception as exc:
         load_error    = str(exc)
@@ -180,5 +181,5 @@ if __name__ == "__main__":
     t = threading.Thread(target=load_model, daemon=True)
     t.start()
 
-    print("🚀  VCare AI (Mistral-7B) starting at http://localhost:5000")
+    print("🚀  VCare AI (Phi-3-mini-4k-instruct) starting at http://localhost:5000")
     app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
