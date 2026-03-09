@@ -5,6 +5,7 @@ Run:  python test-script/test_llm.py
 
 import os
 import threading
+import traceback
 
 import torch
 from flask import Flask, jsonify, render_template, request
@@ -50,6 +51,8 @@ def load_model():
     os.makedirs(CACHE_DIR, exist_ok=True)
 
     try:
+        torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+
         tokenizer = AutoTokenizer.from_pretrained(
             MODEL_NAME,
             cache_dir=CACHE_DIR,
@@ -58,17 +61,20 @@ def load_model():
 
         llm = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=torch_dtype,
             device_map="auto",
             cache_dir=CACHE_DIR,
             low_cpu_mem_usage=True,
             trust_remote_code=True,
+            attn_implementation="eager",   # avoids flash-attn / sdpa dependency
         )
 
         pipe = pipeline(
             "text-generation",
             model=llm,
             tokenizer=tokenizer,
+            torch_dtype=torch_dtype,
+            device_map="auto",
         )
 
         model_loaded  = True
@@ -78,6 +84,7 @@ def load_model():
     except Exception as exc:
         load_error    = str(exc)
         model_loading = False
+        traceback.print_exc()          # prints full stack trace to stderr
         print(f"❌  Failed to load model: {exc}\n")
 
 
@@ -178,7 +185,7 @@ def chat():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     # Start model loading in background so HTTP responses don't block
-    t = threading.Thread(target=load_model, daemon=True)
+    t = threading.Thread(target=load_model, daemon=False)
     t.start()
 
     print("🚀  VCare AI (Phi-3-mini-4k-instruct) starting at http://localhost:5000")
