@@ -1,0 +1,43 @@
+Press CTRL+C to quit
+`torch_dtype` is deprecated! Use `dtype` instead!
+`flash-attention` package not found, consider installing for better performance: No module named 'flash_attn'.
+Current `flash-attention` does not support `window_size`. Either upgrade or use `attn_implementation='eager'`.
+Loading checkpoint shards:   0%|                                                                 | 0/2 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "D:\vcare\test-script\test_llm.py", line 64, in load_model
+    llm = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+    ...<5 lines>...
+        attn_implementation="eager",   # avoids flash-attn / sdpa dependency
+    )
+  File "D:\vcare\.venv\Lib\site-packages\transformers\models\auto\auto_factory.py", line 597, in from_pretrained
+    return model_class.from_pretrained(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        pretrained_model_name_or_path, *model_args, config=config, **hub_kwargs, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\vcare\.venv\Lib\site-packages\transformers\modeling_utils.py", line 277, in _wrapper
+    return func(*args, **kwargs)
+  File "D:\vcare\.venv\Lib\site-packages\transformers\modeling_utils.py", line 5048, in from_pretrained
+    ) = cls._load_pretrained_model(
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        model,
+        ^^^^^^
+    ...<12 lines>...
+        weights_only=weights_only,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\vcare\.venv\Lib\site-packages\transformers\modeling_utils.py", line 5468, in _load_pretrained_model
+    _error_msgs, disk_offload_index = load_shard_file(args)
+                                      ~~~~~~~~~~~~~~~^^^^^^
+  File "D:\vcare\.venv\Lib\site-packages\transformers\modeling_utils.py", line 831, in load_shard_file
+    state_dict = load_state_dict(
+        shard_file, is_quantized=is_quantized, map_location=map_location, weights_only=weights_only
+    )
+  File "D:\vcare\.venv\Lib\site-packages\transformers\modeling_utils.py", line 484, in load_state_dict
+    with safe_open(checkpoint_file, framework="pt") as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: The paging file is too small for this operation to complete. (os error 1455)
+❌  Failed to load model: The paging file is too small for this operation to complete. (os error 1455)
