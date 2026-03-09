@@ -26,21 +26,8 @@ app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 # ---------------------------------------------------------------------------
 MODEL_NAME = "microsoft/Phi-3-mini-4k-instruct"
 
-# ---------------------------------------------------------------------------
-# CUDA / GPU detection
-# ---------------------------------------------------------------------------
-if torch.cuda.is_available():
-    _gpu_name = torch.cuda.get_device_name(0)
-    _vram_gb  = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
-    print(f"✅  CUDA available — GPU: {_gpu_name}  ({_vram_gb:.1f} GB VRAM)")
-    device = torch.device("cuda")
-else:
-    print("⚠️  CUDA not available — running on CPU (slow). "
-          "On Windows make sure you installed the CUDA-enabled PyTorch wheel "
-          "(pip install torch --index-url https://download.pytorch.org/whl/cu121) "
-          "and that your NVIDIA drivers are up-to-date.")
-    device = torch.device("cpu")
-
+device         = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE_MAP     = {"" : 0} if torch.cuda.is_available() else {"" : "cpu"}
 tokenizer      = None
 pipe           = None
 model_loaded   = False
@@ -61,24 +48,12 @@ def load_model():
     global tokenizer, pipe, model_loaded, model_loading, load_error
 
     model_loading = True
-    print(f"\n🔄  Loading {MODEL_NAME} …  (device: {device})\n")
-    OFFLOAD_DIR  = os.path.join(BASE_DIR, "offload_dir")
-    os.makedirs(OFFLOAD_DIR, exist_ok=True)
+    gpu_info = f"GPU: {torch.cuda.get_device_name(0)}" if torch.cuda.is_available() else "CPU only"
+    print(f"\n🔄  Loading {MODEL_NAME} …  (device: {device} | {gpu_info})\n")
+    os.makedirs(CACHE_DIR, exist_ok=True)
 
     try:
-        # Free any leftover GPU memory before loading
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-        # Use bfloat16 on Ampere+ GPUs (RTX 30xx/40xx), float16 on older,
-        # float32 on CPU — all selected automatically.
-        if torch.cuda.is_available():
-            cap = torch.cuda.get_device_capability(0)
-            torch_dtype = torch.bfloat16 if cap[0] >= 8 else torch.float16
-        else:
-            torch_dtype = torch.float32
-
-        print(f"   dtype : {torch_dtype}")
+        torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
         tokenizer = AutoTokenizer.from_pretrained(
             MODEL_NAME,
@@ -88,30 +63,21 @@ def load_model():
 
         llm = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
-            device_map="auto",
-            load_in_4bit=True,             # 4-bit quantization to save RAM
+            torch_dtype=torch_dtype,
+            device_map=DEVICE_MAP,         # explicit index — required on Windows
             cache_dir=CACHE_DIR,
             low_cpu_mem_usage=True,
             trust_remote_code=True,
             attn_implementation="eager",   # avoids flash-attn / sdpa dependency
-            offload_folder=OFFLOAD_DIR,
         )
 
-        # ⚠️  Do NOT pass device_map to pipeline when the model is already
-        #     device-mapped — doing so causes silent CPU fall-back or errors
-        #     on Windows / WSL2.
+        # Do NOT pass device_map/device again — the model is already placed
         pipe = pipeline(
             "text-generation",
             model=llm,
             tokenizer=tokenizer,
-            # dtype=torch_dtype,  # pipeline also accepts dtype but often infers it from model
-            device_map="auto",
+            torch_dtype=torch_dtype,
         )
-
-        if torch.cuda.is_available():
-            used  = torch.cuda.memory_reserved(0) / (1024 ** 3)
-            total = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
-            print(f"   VRAM : {used:.1f} GB used / {total:.1f} GB total")
 
         model_loaded  = True
         model_loading = False
@@ -154,14 +120,8 @@ def generate_response(user_message: str, history: list[dict] | None = None) -> s
             do_sample=True,
             top_p=0.95,
         )
-        answer = result[0]["generated_text"].strip()
-        # Release any fragmented GPU memory after inference
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        return answer
+        return result[0]["generated_text"].strip()
     except Exception as exc:
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
         return f"Error generating response: {exc}"
 
 
@@ -189,21 +149,14 @@ def image_detection():
 @app.route("/health")
 def health():
     """Polled by script.js to show the model-status badge in the header."""
-    info = {
-        "status":        "running",
-        "model_loaded":  model_loaded,
+    return jsonify({
+        "status":       "running",
+        "model_loaded": model_loaded,
         "model_loading": model_loading,
-        "model_name":    MODEL_NAME,
-        "device":        str(device),
-        "cuda_available": torch.cuda.is_available(),
-    }
-    if torch.cuda.is_available():
-        info["gpu_name"]    = torch.cuda.get_device_name(0)
-        info["vram_used_gb"] = round(torch.cuda.memory_reserved(0) / (1024**3), 2)
-        info["vram_total_gb"] = round(
-            torch.cuda.get_device_properties(0).total_memory / (1024**3), 2
-        )
-    return jsonify(info)
+        "model_name":   MODEL_NAME,
+        "device":       str(device),
+        "gpu_name":     torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
+    })
 
 
 @app.route("/chat", methods=["POST"])
