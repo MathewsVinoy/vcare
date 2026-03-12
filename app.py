@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
 import os
+import json
 import numpy as np
 from torch import nn
 import torchvision
@@ -33,6 +34,7 @@ tokenizer = None
 pipe = None
 blood_model = None
 image_model = None
+model_error = None
 
 def load_blood_model():
     """Lazy load the blood sample model when needed"""
@@ -87,67 +89,76 @@ def load_image_model():
 
 def load_model():
     """Load the Phi-3 chat model using the same setup as test_llm.py"""
-    global model, tokenizer, pipe
+    global model, tokenizer, pipe, model_error
 
     if model is not None and tokenizer is not None and pipe is not None:
         return True
-    
-    print("Loading Phi-3 model...")
-    print(f"Model: {model_name}")
-    print(f"Cache directory: {cache_dir}")
-    
-    os.makedirs(cache_dir, exist_ok=True)
-    os.makedirs(offload_dir, exist_ok=True)
-    
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        cache_dir=cache_dir,
-        trust_remote_code=False
-    )
 
-    quantization_config = None
-    max_memory = None
+    try:
+        model_error = None
+        print("Loading Phi-3 model...")
+        print(f"Model: {model_name}")
+        print(f"Cache directory: {cache_dir}")
 
-    if torch.cuda.is_available():
-        max_memory = {0: "2GiB", "cpu": "12GiB"}
-        print(f"Setting GPU budget to {max_memory[0]} and CPU budget to {max_memory['cpu']}")
-        quantization_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            llm_int8_enable_fp32_cpu_offload=True
-        )
-        model = AutoModelForCausalLM.from_pretrained(
+        os.makedirs(cache_dir, exist_ok=True)
+        os.makedirs(offload_dir, exist_ok=True)
+
+        tokenizer = AutoTokenizer.from_pretrained(
             model_name,
-            device_map="auto",
-            max_memory=max_memory,
-            quantization_config=quantization_config,
-            torch_dtype=torch.float16,
             cache_dir=cache_dir,
-            offload_folder=offload_dir,
-            trust_remote_code=False
-        )
-    else:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map="cpu",
-            torch_dtype=torch.float32,
-            cache_dir=cache_dir,
-            offload_folder=offload_dir,
             trust_remote_code=False
         )
 
-    pipe = pipeline(
-        "text-generation",
-        model=model,
-        tokenizer=tokenizer
-    )
+        quantization_config = None
+        max_memory = None
 
-    print("Model loaded successfully!")
-    return True
+        if torch.cuda.is_available():
+            max_memory = {0: "2GiB", "cpu": "12GiB"}
+            print(f"Setting GPU budget to {max_memory[0]} and CPU budget to {max_memory['cpu']}")
+            quantization_config = BitsAndBytesConfig(
+                load_in_8bit=True,
+                llm_int8_enable_fp32_cpu_offload=True
+            )
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                device_map="auto",
+                max_memory=max_memory,
+                quantization_config=quantization_config,
+                torch_dtype=torch.float16,
+                cache_dir=cache_dir,
+                offload_folder=offload_dir,
+                trust_remote_code=False
+            )
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                device_map="cpu",
+                torch_dtype=torch.float32,
+                cache_dir=cache_dir,
+                offload_folder=offload_dir,
+                trust_remote_code=False
+            )
+
+        pipe = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer
+        )
+
+        print("Model loaded successfully!")
+        return True
+    except Exception as e:
+        model = None
+        tokenizer = None
+        pipe = None
+        model_error = str(e)
+        print(f"❌ Error loading chat model: {model_error}")
+        return False
 
 def chat(prompt):
     """Generate a response using Phi-3"""
     if pipe is None and not load_model():
-        return "Chat model could not be loaded right now."
+        return f"Chat model could not be loaded right now. {model_error or ''}".strip()
     
     messages = [
         {"role": "user", "content": prompt},
@@ -155,6 +166,14 @@ def chat(prompt):
 
     output = pipe(messages, **generation_args)
     return output[0]['generated_text']
+
+def stream_chat_response(response_text):
+    """Yield chat output in SSE format for the frontend."""
+    chunk_size = 24
+    for i in range(0, len(response_text), chunk_size):
+        chunk = response_text[i:i + chunk_size]
+        yield f"data: {json.dumps({'token': chunk})}\n\n"
+    yield "data: [DONE]\n\n"
 
 @app.route('/')
 def index():
@@ -260,12 +279,53 @@ def chat_endpoint():
             'status': 'error'
         }), 500
 
+@app.route('/chat/stream', methods=['POST'])
+def chat_stream_endpoint():
+    """Handle streaming chat requests for the frontend."""
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '')
+
+        if not user_message.strip():
+            return jsonify({'error': 'Empty message'}), 400
+
+        response_text = chat(user_message)
+
+        if response_text.startswith("Chat model could not be loaded right now."):
+            def error_stream():
+                yield f"data: {json.dumps({'error': response_text})}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return Response(
+                stream_with_context(error_stream()),
+                mimetype='text/event-stream',
+                headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+            )
+
+        return Response(
+            stream_with_context(stream_chat_response(response_text)),
+            mimetype='text/event-stream',
+            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+        )
+
+    except Exception as e:
+        def error_stream():
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return Response(
+            stream_with_context(error_stream()),
+            mimetype='text/event-stream',
+            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+        )
+
 @app.route('/health')
 def health():
     """Check if the model is loaded"""
     return jsonify({
         'status': 'ready' if model is not None else 'loading',
-        'model_loaded': model is not None
+        'model_loaded': model is not None,
+        'error': model_error
     })
 
 @app.route('/predict_skin_cancer', methods=['POST'])
@@ -331,8 +391,5 @@ def predict_skin_cancer():
         }), 500
 
 if __name__ == '__main__':
-    # Load model before starting the server
-    load_model()
-    
     # Run the Flask app
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
