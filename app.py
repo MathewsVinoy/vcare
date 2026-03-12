@@ -4,8 +4,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from peft import PeftModel
 import os
 import numpy as np
-from torch import nn
-import torchvision
+import timm
 from torchvision import transforms
 from PIL import Image
 import io
@@ -52,11 +51,13 @@ def load_blood_model():
         print(f"❌ Error loading blood model: {e}")
         return False
 
-def get_vit_model(num_classes=2):
-    """Create ViT model architecture"""
-    model = torchvision.models.vit_b_16(weights="IMAGENET1K_V1")
-    in_features = model.heads.head.in_features
-    model.heads.head = nn.Linear(in_features, num_classes)
+def get_skin_cancer_model(num_classes=2):
+    """Create EfficientFormer model architecture (same as training script)"""
+    model = timm.create_model(
+        "efficientformer_l1",
+        pretrained=False,
+        num_classes=num_classes
+    )
     return model
 
 def load_image_model():
@@ -67,14 +68,14 @@ def load_image_model():
         return True
     
     try:
-        image_model = get_vit_model(num_classes=2)
-        image_model.load_state_dict(torch.load('model/model.pth', map_location=device))
+        image_model = get_skin_cancer_model(num_classes=2)
+        image_model.load_state_dict(torch.load('model/efficientformer_model.pth', map_location=device))
         image_model = image_model.to(device)
         image_model.eval()
         print(f"✅ Skin cancer detection model loaded successfully on {device}!")
         return True
     except FileNotFoundError:
-        print("❌ PyTorch model file not found at 'model/model.pth'")
+        print("❌ PyTorch model file not found at 'model/efficientformer_model.pth'")
         return False
     except Exception as e:
         print(f"❌ Error loading image model: {e}")
@@ -267,7 +268,7 @@ def predict_skin_cancer():
         # Lazy load image model only when needed
         if not load_image_model():
             return jsonify({
-                'error': 'Image model not loaded. Please check if model/model.pth exists.',
+                'error': 'Image model not loaded. Please check if model/efficientformer_model.pth exists.',
                 'success': False
             }), 500
             
