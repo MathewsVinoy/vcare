@@ -67,6 +67,13 @@ class ChatModel:
             'wbc', 'rbc', 'platelet', 'hemoglobin', 'medical advice'
         }
 
+        self.math_keywords = {
+            'math', 'mathematics', 'solve', 'equation', 'algebra', 'geometry',
+            'trigonometry', 'calculus', 'integral', 'derivative', 'multiply',
+            'division', 'divide', 'addition', 'subtract', 'subtraction', 'sum',
+            'product', 'percentage', 'formula', 'simplify', 'factorial'
+        }
+
         self.out_of_scope_message = (
             "Sorry, I can only assist with cancer-related or medical questions. "
             "Please ask about symptoms, diagnosis, treatment, reports, or other health concerns."
@@ -100,15 +107,68 @@ class ChatModel:
         normalized = re.sub(r'\s+', ' ', normalized)
         return normalized
 
+    def _contains_keyword(self, text, keywords):
+        """Match keywords using word boundaries where possible."""
+        text_lower = self._normalize_text(text)
+
+        for keyword in keywords:
+            pattern = r'(?<!\w)' + re.escape(keyword) + r'(?!\w)'
+            if re.search(pattern, text_lower):
+                return True
+
+        return False
+
     def is_cancer_related(self, text):
         """Check if the input is cancer-related."""
-        text_lower = self._normalize_text(text)
-        return any(keyword in text_lower for keyword in self.cancer_keywords)
+        return self._contains_keyword(text, self.cancer_keywords)
 
     def is_medical_related(self, text):
         """Check if the input is medical-related."""
+        return self._contains_keyword(text, self.medical_keywords) or self.is_cancer_related(text)
+
+    def is_math_related(self, text):
+        """Reject explicit mathematics or generic calculation prompts."""
         text_lower = self._normalize_text(text)
-        return any(keyword in text_lower for keyword in self.medical_keywords) or self.is_cancer_related(text)
+
+        if self._contains_keyword(text_lower, self.math_keywords):
+            return True
+
+        math_expression_patterns = [
+            r'\b\d+\s*[-+*/x=]\s*\d+\b',
+            r'\bwhat\s+is\s+\d+',
+            r'\bcalculate\b',
+            r'\bsolve\s+\d+',
+            r'\b\d+\s*%\s+of\s+\d+\b'
+        ]
+
+        return any(re.search(pattern, text_lower) for pattern in math_expression_patterns)
+
+    def is_random_text(self, text):
+        """Detect likely gibberish or random non-medical text."""
+        text_lower = self._normalize_text(text)
+
+        if not text_lower:
+            return True
+
+        tokens = re.findall(r'[a-zA-Z]+', text_lower)
+        if not tokens:
+            return True
+
+        if len(tokens) == 1:
+            token = tokens[0]
+            vowel_count = sum(1 for char in token if char in 'aeiou')
+            if len(token) >= 5 and vowel_count == 0:
+                return True
+            if len(token) >= 6 and len(set(token)) <= 2:
+                return True
+
+        random_patterns = [
+            r'^[a-z]{1,4}$',
+            r'^(.)\1{4,}$',
+            r'^[bcdfghjklmnpqrstvwxyz]{5,}$'
+        ]
+
+        return any(re.fullmatch(pattern, text_lower) for pattern in random_patterns)
 
     def build_domain_prompt(self, prompt):
         """Add a domain instruction based on the detected topic."""
@@ -208,6 +268,18 @@ class ChatModel:
             return {
                 'is_greeting': True,
                 'choices': self.get_greeting_choices()
+            }
+
+        if self.is_random_text(prompt) and not self.is_medical_related(prompt):
+            return {
+                'is_greeting': False,
+                'response': self.out_of_scope_message
+            }
+
+        if self.is_math_related(prompt) and not self.is_medical_related(prompt):
+            return {
+                'is_greeting': False,
+                'response': self.out_of_scope_message
             }
 
         # Reject prompts outside the medical/cancer domain
