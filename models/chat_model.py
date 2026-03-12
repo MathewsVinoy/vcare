@@ -4,6 +4,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
 import os
 import random
+import re
 
 
 class ChatModel:
@@ -46,6 +47,30 @@ class ChatModel:
                 "Hello friend! 🌟 VCare AI is at your service. How can I support your health journey today?"
             ]
         }
+
+        self.cancer_keywords = {
+            'cancer', 'tumor', 'tumour', 'oncology', 'oncologist', 'chemotherapy',
+            'radiation', 'metastasis', 'biopsy', 'malignant', 'benign', 'leukemia',
+            'leukaemia', 'lymphoma', 'melanoma', 'carcinoma', 'sarcoma', 'neoplasm',
+            'breast cancer', 'lung cancer', 'skin cancer', 'blood cancer', 'colon cancer',
+            'prostate cancer', 'cervical cancer', 'brain tumor', 'cancer stage',
+            'cancer symptoms', 'cancer treatment', 'cancer diagnosis'
+        }
+
+        self.medical_keywords = {
+            'doctor', 'hospital', 'medicine', 'medical', 'health', 'healthcare', 'symptom',
+            'symptoms', 'diagnosis', 'treatment', 'disease', 'illness', 'pain', 'fever',
+            'infection', 'blood', 'scan', 'mri', 'ct', 'xray', 'x-ray', 'ultrasound',
+            'test', 'lab', 'report', 'prescription', 'surgery', 'clinic', 'patient',
+            'therapy', 'dose', 'drug', 'tablet', 'doctor appointment', 'rash', 'headache',
+            'cough', 'diabetes', 'heart', 'liver', 'kidney', 'brain', 'skin', 'biopsy',
+            'wbc', 'rbc', 'platelet', 'hemoglobin', 'medical advice'
+        }
+
+        self.out_of_scope_message = (
+            "Sorry, I can only assist with cancer-related or medical questions. "
+            "Please ask about symptoms, diagnosis, treatment, reports, or other health concerns."
+        )
     
     def is_greeting(self, text):
         """Check if the input text is a greeting"""
@@ -68,6 +93,43 @@ class ChatModel:
             choices.append(response)
         
         return choices
+
+    def _normalize_text(self, text):
+        """Normalize text for lightweight intent matching."""
+        normalized = text.strip().lower()
+        normalized = re.sub(r'\s+', ' ', normalized)
+        return normalized
+
+    def is_cancer_related(self, text):
+        """Check if the input is cancer-related."""
+        text_lower = self._normalize_text(text)
+        return any(keyword in text_lower for keyword in self.cancer_keywords)
+
+    def is_medical_related(self, text):
+        """Check if the input is medical-related."""
+        text_lower = self._normalize_text(text)
+        return any(keyword in text_lower for keyword in self.medical_keywords) or self.is_cancer_related(text)
+
+    def build_domain_prompt(self, prompt):
+        """Add a domain instruction based on the detected topic."""
+        if self.is_cancer_related(prompt):
+            domain_instruction = (
+                "You are VCare AI, a cancer-focused medical assistant. "
+                "Answer only in the context of cancer, oncology, diagnosis support, symptoms, screening, reports, "
+                "risk factors, and treatment guidance. Keep the response clear, supportive, and medically relevant. "
+                "Always remind the user to consult a qualified doctor for diagnosis or treatment decisions."
+            )
+        else:
+            domain_instruction = (
+                "You are VCare AI, a medical assistant. "
+                "Answer only medical or health-related questions in a clear and careful way. "
+                "Do not provide unrelated information. Encourage consulting a qualified doctor for urgent or serious concerns."
+            )
+
+        return [
+            {"role": "system", "content": domain_instruction},
+            {"role": "user", "content": prompt}
+        ]
     
     def load(self):
         """Load the chat model and pipeline"""
@@ -147,6 +209,13 @@ class ChatModel:
                 'is_greeting': True,
                 'choices': self.get_greeting_choices()
             }
+
+        # Reject prompts outside the medical/cancer domain
+        if not self.is_medical_related(prompt):
+            return {
+                'is_greeting': False,
+                'response': self.out_of_scope_message
+            }
         
         # For non-greeting messages, use the full model
         if self.pipe is None:
@@ -156,7 +225,7 @@ class ChatModel:
                     'response': f"Chat model could not be loaded right now. {self.error or ''}".strip()
                 }
         
-        messages = [{"role": "user", "content": prompt}]
+        messages = self.build_domain_prompt(prompt)
         output = self.pipe(messages, **self.generation_args)
         
         return {
