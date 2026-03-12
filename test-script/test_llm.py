@@ -1,195 +1,82 @@
-"""
-VCare AI — Flask chat server powered by Phi-3-mini-4k-instruct
-Run:  python test-script/test_llm.py
-"""
-
-import os
-import threading
-import traceback
-
 import torch
-from flask import Flask, jsonify, render_template, request
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import os
 
-# ---------------------------------------------------------------------------
-# Paths — point Flask at the project-level templates / static folders
-# ---------------------------------------------------------------------------
-BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
-STATIC_DIR   = os.path.join(BASE_DIR, "static")
-CACHE_DIR    = os.path.join(BASE_DIR, "model_cache")
-
-app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
-
-# ---------------------------------------------------------------------------
 # Model configuration
-# ---------------------------------------------------------------------------
-MODEL_NAME = "microsoft/Phi-3-mini-4k-instruct"
+model_name = "microsoft/Phi-3-mini-4k-instruct"
 
-device         = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-DEVICE_MAP     = {"" : 0} if torch.cuda.is_available() else {"" : "cpu"}
-tokenizer      = None
-pipe           = None
-model_loaded   = False
-model_loading  = False
-load_error     = None
+# Set local cache directory
+cache_dir = os.path.join(os.path.dirname(__file__), "model_cache")
+os.makedirs(cache_dir, exist_ok=True)
 
-SYSTEM_PROMPT = (
-    "You are VCare AI, an intelligent medical assistant specialising in cancer "
-    "diagnosis, blood analysis, and skin cancer detection. Provide accurate, "
-    "helpful medical information while always advising the user to consult a "
-    "qualified healthcare professional for any actual diagnosis or treatment."
+print("Loading Phi-3 model...")
+print(f"Model: {model_name}")
+print(f"Cache directory: {cache_dir}")
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(
+    model_name,
+    trust_remote_code=False,  # Use transformers' built-in implementation
+    cache_dir=cache_dir
 )
 
-# ---------------------------------------------------------------------------
-# Model loading (runs in a background thread so the server starts immediately)
-# ---------------------------------------------------------------------------
-def load_model():
-    global tokenizer, pipe, model_loaded, model_loading, load_error
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    device_map="auto",
+    torch_dtype=torch.float16,  # Use float16 for efficiency
+    trust_remote_code=False,  # Use transformers' built-in implementation
+    cache_dir=cache_dir,
+    attn_implementation="eager"  # Use eager attention for better compatibility
+)
 
-    model_loading = True
-    gpu_info = f"GPU: {torch.cuda.get_device_name(0)}" if torch.cuda.is_available() else "CPU only"
-    print(f"\n🔄  Loading {MODEL_NAME} …  (device: {device} | {gpu_info})\n")
-    os.makedirs(CACHE_DIR, exist_ok=True)
+print(f"Model loaded successfully on device: {model.device}")
 
-    try:
-        torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+# Create a text generation pipeline
+pipe = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+)
 
-        tokenizer = AutoTokenizer.from_pretrained(
-            MODEL_NAME,
-            cache_dir=CACHE_DIR,
-            trust_remote_code=True,
-        )
+# Generation settings
+generation_args = {
+    "max_new_tokens": 500,
+    "return_full_text": False,
+    "temperature": 0.7,
+    "do_sample": True,
+}
 
-        llm = AutoModelForCausalLM.from_pretrained(
-            MODEL_NAME,
-            torch_dtype=torch_dtype,
-            device_map=DEVICE_MAP,         # explicit index — required on Windows
-            cache_dir=CACHE_DIR,
-            low_cpu_mem_usage=True,
-            trust_remote_code=True,
-            attn_implementation="eager",   # avoids flash-attn / sdpa dependency
-        )
-
-        # Do NOT pass device_map/device again — the model is already placed
-        pipe = pipeline(
-            "text-generation",
-            model=llm,
-            tokenizer=tokenizer,
-            torch_dtype=torch_dtype,
-        )
-
-        model_loaded  = True
-        model_loading = False
-        print("✅  Phi-3-mini-4k-instruct loaded successfully!\n")
-
-    except Exception as exc:
-        load_error    = str(exc)
-        model_loading = False
-        traceback.print_exc()          # prints full stack trace to stderr
-        print(f"❌  Failed to load model: {exc}\n")
+# Example usage
+def chat(prompt):
+    """Generate a response using Phi-3"""
+    messages = [
+        {"role": "user", "content": prompt},
+    ]
+    
+    output = pipe(messages, **generation_args)
+    return output[0]['generated_text']
 
 
-# ---------------------------------------------------------------------------
-# Chat helper
-# ---------------------------------------------------------------------------
-def generate_response(user_message: str, history: list[dict] | None = None) -> str:
-    """Build the message list and call the pipeline."""
-    if pipe is None:
-        if model_loading:
-            return "⏳ The model is still loading — please try again in a moment."
-        if load_error:
-            return f"❌ Model failed to load: {load_error}"
-        return "Model is not loaded yet. Please wait…"
-
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-    if history:
-        for entry in history:
-            if isinstance(entry, dict) and "role" in entry and "content" in entry:
-                messages.append(entry)
-
-    messages.append({"role": "user", "content": user_message})
-
-    try:
-        result = pipe(
-            messages,
-            max_new_tokens=512,
-            return_full_text=False,
-            temperature=0.7,
-            do_sample=True,
-            top_p=0.95,
-        )
-        return result[0]["generated_text"].strip()
-    except Exception as exc:
-        return f"Error generating response: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# Routes — page rendering
-# ---------------------------------------------------------------------------
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/blood_sample")
-def blood_sample():
-    return render_template("blood_sample.html")
-
-
-@app.route("/image_detection")
-def image_detection():
-    return render_template("image_detection.html")
-
-
-# ---------------------------------------------------------------------------
-# Routes — API
-# ---------------------------------------------------------------------------
-@app.route("/health")
-def health():
-    """Polled by script.js to show the model-status badge in the header."""
-    return jsonify({
-        "status":       "running",
-        "model_loaded": model_loaded,
-        "model_loading": model_loading,
-        "model_name":   MODEL_NAME,
-        "device":       str(device),
-        "gpu_name":     torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
-    })
-
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    """
-    Expected JSON body:
-      { "message": "<user text>", "history": [ {role, content}, … ] }
-
-    Returns:
-      { "response": "<assistant text>", "success": true }
-    """
-    try:
-        data = request.get_json(silent=True) or {}
-        user_message = (data.get("message") or "").strip()
-
-        if not user_message:
-            return jsonify({"error": "No message provided", "success": False}), 400
-
-        history  = data.get("history", [])
-        response = generate_response(user_message, history)
-        return jsonify({"response": response, "success": True})
-
-    except Exception as exc:
-        return jsonify({"error": str(exc), "success": False}), 500
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# Test the model
 if __name__ == "__main__":
-    # Start model loading in background so HTTP responses don't block
-    t = threading.Thread(target=load_model, daemon=False)
-    t.start()
-
-    print("🚀  VCare AI (Phi-3-mini-4k-instruct) starting at http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    print("\n" + "="*50)
+    print("Phi-3 Model Ready!")
+    print("="*50 + "\n")
+    
+    # Example prompt
+    test_prompt = "What is machine learning? Explain in simple terms."
+    
+    print(f"User: {test_prompt}\n")
+    response = chat(test_prompt)
+    print(f"Phi-3: {response}\n")
+    
+    # Interactive mode
+    print("\nEntering interactive mode. Type 'quit' or 'exit' to stop.\n")
+    while True:
+        user_input = input("You: ")
+        if user_input.lower() in ['quit', 'exit', 'q']:
+            print("Goodbye!")
+            break
+        if user_input.strip():
+            response = chat(user_input)
+            print(f"\nPhi-3: {response}\n")
