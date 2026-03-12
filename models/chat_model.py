@@ -5,6 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndB
 import os
 import random
 import re
+from collections import OrderedDict
 
 
 class ChatModel:
@@ -21,10 +22,10 @@ class ChatModel:
         self.error = None
         
         self.generation_args = {
-            "max_new_tokens": 300,
-            "temperature": 0.7,
-            "do_sample": True,
-            "return_full_text": False
+            "max_new_tokens": 220,
+            "do_sample": False,
+            "return_full_text": False,
+            "repetition_penalty": 1.08
         }
         
         # Greeting keywords and custom responses
@@ -78,6 +79,43 @@ class ChatModel:
             "Sorry, I can only assist with cancer-related or medical questions. "
             "Please ask about symptoms, diagnosis, treatment, reports, or other health concerns."
         )
+
+        self.max_cached_responses = 128
+        self.response_cache = OrderedDict()
+
+        self.cancer_patterns = self._compile_keyword_patterns(self.cancer_keywords)
+        self.medical_patterns = self._compile_keyword_patterns(self.medical_keywords)
+        self.math_patterns = self._compile_keyword_patterns(self.math_keywords)
+        self.math_expression_patterns = [
+            re.compile(r'\b\d+\s*[-+*/x=]\s*\d+\b'),
+            re.compile(r'\bwhat\s+is\s+\d+'),
+            re.compile(r'\bcalculate\b'),
+            re.compile(r'\bsolve\s+\d+'),
+            re.compile(r'\b\d+\s*%\s+of\s+\d+\b')
+        ]
+        self.random_patterns = [
+            re.compile(r'^[a-z]{1,4}$'),
+            re.compile(r'^(.)\1{4,}$'),
+            re.compile(r'^[bcdfghjklmnpqrstvwxyz]{5,}$')
+        ]
+
+    def _compile_keyword_patterns(self, keywords):
+        """Compile keyword regex patterns once for faster matching."""
+        return [re.compile(r'(?<!\w)' + re.escape(keyword) + r'(?!\w)') for keyword in keywords]
+
+    def _get_cached_response(self, prompt):
+        """Return cached response for repeated prompts."""
+        cached = self.response_cache.get(prompt)
+        if cached is not None:
+            self.response_cache.move_to_end(prompt)
+        return cached
+
+    def _cache_response(self, prompt, response):
+        """Store response in a small LRU-style cache."""
+        self.response_cache[prompt] = response
+        self.response_cache.move_to_end(prompt)
+        if len(self.response_cache) > self.max_cached_responses:
+            self.response_cache.popitem(last=False)
     
     def is_greeting(self, text):
         """Check if the input text is a greeting"""
@@ -111,37 +149,32 @@ class ChatModel:
         """Match keywords using word boundaries where possible."""
         text_lower = self._normalize_text(text)
 
-        for keyword in keywords:
-            pattern = r'(?<!\w)' + re.escape(keyword) + r'(?!\w)'
-            if re.search(pattern, text_lower):
+        patterns = keywords
+        if isinstance(keywords, set):
+            patterns = self._compile_keyword_patterns(keywords)
+
+        for pattern in patterns:
+            if pattern.search(text_lower):
                 return True
 
         return False
 
     def is_cancer_related(self, text):
         """Check if the input is cancer-related."""
-        return self._contains_keyword(text, self.cancer_keywords)
+        return self._contains_keyword(text, self.cancer_patterns)
 
     def is_medical_related(self, text):
         """Check if the input is medical-related."""
-        return self._contains_keyword(text, self.medical_keywords) or self.is_cancer_related(text)
+        return self._contains_keyword(text, self.medical_patterns) or self.is_cancer_related(text)
 
     def is_math_related(self, text):
         """Reject explicit mathematics or generic calculation prompts."""
         text_lower = self._normalize_text(text)
 
-        if self._contains_keyword(text_lower, self.math_keywords):
+        if self._contains_keyword(text_lower, self.math_patterns):
             return True
 
-        math_expression_patterns = [
-            r'\b\d+\s*[-+*/x=]\s*\d+\b',
-            r'\bwhat\s+is\s+\d+',
-            r'\bcalculate\b',
-            r'\bsolve\s+\d+',
-            r'\b\d+\s*%\s+of\s+\d+\b'
-        ]
-
-        return any(re.search(pattern, text_lower) for pattern in math_expression_patterns)
+        return any(pattern.search(text_lower) for pattern in self.math_expression_patterns)
 
     def is_random_text(self, text):
         """Detect likely gibberish or random non-medical text."""
@@ -162,13 +195,7 @@ class ChatModel:
             if len(token) >= 6 and len(set(token)) <= 2:
                 return True
 
-        random_patterns = [
-            r'^[a-z]{1,4}$',
-            r'^(.)\1{4,}$',
-            r'^[bcdfghjklmnpqrstvwxyz]{5,}$'
-        ]
-
-        return any(re.fullmatch(pattern, text_lower) for pattern in random_patterns)
+        return any(pattern.fullmatch(text_lower) for pattern in self.random_patterns)
 
     def build_domain_prompt(self, prompt):
         """Add a domain instruction based on the detected topic."""
@@ -249,6 +276,7 @@ class ChatModel:
                 model=self.model,
                 tokenizer=self.tokenizer
             )
+            self.model.eval()
             
             print("Model loaded successfully!")
             return True
@@ -263,47 +291,65 @@ class ChatModel:
     
     def chat(self, prompt):
         """Generate a chat response or greeting choices"""
+        normalized_prompt = self._normalize_text(prompt)
+
         # Check if input is a greeting
-        if self.is_greeting(prompt):
-            return {
+        if self.is_greeting(normalized_prompt):
+            result = {
                 'is_greeting': True,
                 'choices': self.get_greeting_choices()
             }
+            self._cache_response(normalized_prompt, result)
+            return result
 
-        if self.is_random_text(prompt) and not self.is_medical_related(prompt):
-            return {
+        cached_response = self._get_cached_response(normalized_prompt)
+        if cached_response is not None:
+            return cached_response
+
+        if self.is_random_text(normalized_prompt) and not self.is_medical_related(normalized_prompt):
+            result = {
                 'is_greeting': False,
                 'response': self.out_of_scope_message
             }
+            self._cache_response(normalized_prompt, result)
+            return result
 
-        if self.is_math_related(prompt) and not self.is_medical_related(prompt):
-            return {
+        if self.is_math_related(normalized_prompt) and not self.is_medical_related(normalized_prompt):
+            result = {
                 'is_greeting': False,
                 'response': self.out_of_scope_message
             }
+            self._cache_response(normalized_prompt, result)
+            return result
 
         # Reject prompts outside the medical/cancer domain
-        if not self.is_medical_related(prompt):
-            return {
+        if not self.is_medical_related(normalized_prompt):
+            result = {
                 'is_greeting': False,
                 'response': self.out_of_scope_message
             }
+            self._cache_response(normalized_prompt, result)
+            return result
         
         # For non-greeting messages, use the full model
         if self.pipe is None:
             if not self.load():
-                return {
+                result = {
                     'is_greeting': False,
                     'response': f"Chat model could not be loaded right now. {self.error or ''}".strip()
                 }
+                self._cache_response(normalized_prompt, result)
+                return result
         
         messages = self.build_domain_prompt(prompt)
         output = self.pipe(messages, **self.generation_args)
-        
-        return {
+
+        result = {
             'is_greeting': False,
             'response': output[0]['generated_text']
         }
+        self._cache_response(normalized_prompt, result)
+        return result
     
     def is_loaded(self):
         """Check if model is loaded"""
