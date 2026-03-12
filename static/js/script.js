@@ -115,7 +115,14 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const payload = line.slice(6).trim();
-          if (payload === "[DONE]") return;
+          if (payload === "[DONE]") {
+            // Render markdown when streaming is complete
+            if (bubble) {
+              const fullText = bubble.textContent;
+              bubble.innerHTML = renderMarkdown(fullText);
+            }
+            return;
+          }
           try {
             const parsed = JSON.parse(payload);
             if (parsed.token) {
@@ -140,7 +147,63 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // -- Configure Markdown and Highlighting --
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+    headerIds: true,
+    mangle: false,
+  });
+
+  const originalMarked = marked.parse;
+  marked.parse = (markdown) => {
+    const html = originalMarked.call(marked, markdown);
+    return html;
+  };
+
+  function renderMarkdown(text) {
+    """Render markdown text to HTML with syntax highlighting"""
+    let html = marked.parse(text);
+    
+    // Highlight code blocks
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    doc.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
+    
+    return doc.body.innerHTML;
+  }
+
   function appendMessage(text, role) {
+    const msgEl = document.createElement("div");
+    msgEl.className = `message ${role}`;
+
+    const avatar = document.createElement("div");
+    avatar.className = "msg-avatar";
+    avatar.innerHTML =
+      role === "user"
+        ? '<i class="fas fa-user"></i>'
+        : '<i class="fas fa-robot"></i>';
+
+    const bubble = document.createElement("div");
+    bubble.className = "msg-bubble";
+    
+    // Render markdown for assistant messages, plain text for user messages
+    if (role === "assistant" && text.trim()) {
+      bubble.innerHTML = renderMarkdown(text);
+    } else {
+      bubble.textContent = text;
+    }
+
+    msgEl.appendChild(avatar);
+    msgEl.appendChild(bubble);
+    messagesList.appendChild(msgEl);
+    scrollToBottom();
+    return msgEl;
+  }
+
+  function appendMessage_OLD(text, role) {
     const msgEl = document.createElement("div");
     msgEl.className = `message ${role}`;
 

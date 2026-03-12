@@ -1,138 +1,199 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VCare AI — Medical Assistant</title>
-    <meta name="description" content="VCare AI — Your intelligent medical assistant for cancer diagnosis, blood analysis, and skin cancer detection.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+    <meta
+      name="description"
+      content="VCare AI — Your intelligent medical assistant for cancer diagnosis, blood analysis, and skin cancer detection."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
+  <body>
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-heartbeat"></i>
-                </div>
-                <span class="logo-text">VCare <span class="logo-accent">AI</span></span>
-            </div>
-            <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
-                <i class="fas fa-bars"></i>
-            </button>
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">
+            <i class="fas fa-heartbeat"></i>
+          </div>
+          <span class="logo-text"
+            >VCare <span class="logo-accent">AI</span></span
+          >
         </div>
+        <button
+          class="sidebar-toggle"
+          id="sidebarToggle"
+          title="Toggle sidebar"
+        >
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
 
-        <nav class="sidebar-nav">
-            <div class="nav-section-label">Tools</div>
-            <a href="/" class="nav-item active" id="nav-chat">
-                <div class="nav-item-icon"><i class="fas fa-comment-medical"></i></div>
-                <span>AI Chat</span>
-                <div class="nav-item-badge">Live</div>
-            </a>
-            <a href="/blood_sample" class="nav-item" id="nav-blood">
-                <div class="nav-item-icon"><i class="fas fa-vial"></i></div>
-                <span>Blood Analysis</span>
-            </a>
-            <a href="/image_detection" class="nav-item" id="nav-image">
-                <div class="nav-item-icon"><i class="fas fa-microscope"></i></div>
-                <span>Skin Detection</span>
-            </a>
-        </nav>
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Tools</div>
+        <a href="/" class="nav-item active" id="nav-chat">
+          <div class="nav-item-icon">
+            <i class="fas fa-comment-medical"></i>
+          </div>
+          <span>AI Chat</span>
+          <div class="nav-item-badge">Live</div>
+        </a>
+        <a href="/blood_sample" class="nav-item" id="nav-blood">
+          <div class="nav-item-icon"><i class="fas fa-vial"></i></div>
+          <span>Blood Analysis</span>
+        </a>
+        <a href="/image_detection" class="nav-item" id="nav-image">
+          <div class="nav-item-icon"><i class="fas fa-microscope"></i></div>
+          <span>Skin Detection</span>
+        </a>
+      </nav>
 
-        <div class="sidebar-footer">
-            <div class="model-badge">
-                <i class="fas fa-microchip"></i>
-                <span>Phi-3 Mini · LoRA</span>
-            </div>
+      <div class="sidebar-footer">
+        <div class="model-badge">
+          <i class="fas fa-microchip"></i>
+          <span>Phi-3 Mini · LoRA</span>
         </div>
+      </div>
     </aside>
 
     <!-- Main Content -->
     <div class="app-body" id="appBody">
-        <!-- Top Bar (mobile) -->
-        <header class="topbar">
-            <button class="topbar-menu-btn" id="mobileMenuBtn">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div class="topbar-title">AI Chat</div>
-            <div class="topbar-status" id="modelStatus">
-                <span class="status-dot"></span>
-                <span class="status-text">Checking…</span>
-            </div>
-        </header>
-
-        <!-- Chat Area -->
-        <main class="chat-area" id="chatArea">
-            <!-- Welcome Screen -->
-            <div class="welcome-screen" id="welcomeScreen">
-                <div class="welcome-orbs">
-                    <div class="orb orb-1"></div>
-                    <div class="orb orb-2"></div>
-                    <div class="orb orb-3"></div>
-                </div>
-                <div class="welcome-content">
-                    <div class="welcome-icon">
-                        <i class="fas fa-dna"></i>
-                    </div>
-                    <h1 class="welcome-heading">How can I assist you today?</h1>
-                    <p class="welcome-sub">Ask me anything about cancer diagnosis, symptoms, treatment options, or use the tools in the sidebar for detailed analysis.</p>
-
-                    <div class="suggestion-grid">
-                        <button class="suggestion-card" onclick="fillSuggestion('What are the early symptoms of leukemia?')">
-                            <i class="fas fa-search-plus"></i>
-                            <span>Early symptoms of leukemia</span>
-                        </button>
-                        <button class="suggestion-card" onclick="fillSuggestion('Explain what bone marrow blasts percentage means')">
-                            <i class="fas fa-bone"></i>
-                            <span>Bone marrow blasts explained</span>
-                        </button>
-                        <button class="suggestion-card" onclick="fillSuggestion('What is the difference between benign and malignant tumors?')">
-                            <i class="fas fa-flask"></i>
-                            <span>Benign vs malignant tumors</span>
-                        </button>
-                        <button class="suggestion-card" onclick="fillSuggestion('What does a high WBC count indicate?')">
-                            <i class="fas fa-vial"></i>
-                            <span>High WBC count meaning</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Messages -->
-            <div class="messages-list" id="messagesList"></div>
-        </main>
-
-        <!-- Input Bar -->
-        <div class="input-bar" id="inputBar">
-            <div class="input-shell">
-                <textarea
-                    class="chat-input"
-                    id="chatInput"
-                    placeholder="Ask about cancer, symptoms, or test results…"
-                    rows="1"
-                ></textarea>
-                <button class="send-btn" id="sendBtn" title="Send message">
-                    <i class="fas fa-arrow-up"></i>
-                </button>
-            </div>
-            <div class="input-tools">
-                <button class="input-tool-btn" onclick="window.location.href='/blood_sample'">
-                    <i class="fas fa-vial"></i>
-                    <span>Blood Analysis</span>
-                </button>
-                <button class="input-tool-btn" onclick="window.location.href='/image_detection'">
-                    <i class="fas fa-microscope"></i>
-                    <span>Skin Detection</span>
-                </button>
-                <span class="input-disclaimer">VCare AI is for informational purposes only — always consult a doctor.</span>
-            </div>
+      <!-- Top Bar (mobile) -->
+      <header class="topbar">
+        <button class="topbar-menu-btn" id="mobileMenuBtn">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="topbar-title">AI Chat</div>
+        <div class="topbar-status" id="modelStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Checking…</span>
         </div>
+      </header>
+
+      <!-- Chat Area -->
+      <main class="chat-area" id="chatArea">
+        <!-- Welcome Screen -->
+        <div class="welcome-screen" id="welcomeScreen">
+          <div class="welcome-orbs">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+          </div>
+          <div class="welcome-content">
+            <div class="welcome-icon">
+              <i class="fas fa-dna"></i>
+            </div>
+            <h1 class="welcome-heading">How can I assist you today?</h1>
+            <p class="welcome-sub">
+              Ask me anything about cancer diagnosis, symptoms, treatment
+              options, or use the tools in the sidebar for detailed analysis.
+            </p>
+
+            <div class="suggestion-grid">
+              <button
+                class="suggestion-card"
+                onclick="
+                  fillSuggestion('What are the early symptoms of leukemia?')
+                "
+              >
+                <i class="fas fa-search-plus"></i>
+                <span>Early symptoms of leukemia</span>
+              </button>
+              <button
+                class="suggestion-card"
+                onclick="
+                  fillSuggestion(
+                    'Explain what bone marrow blasts percentage means',
+                  )
+                "
+              >
+                <i class="fas fa-bone"></i>
+                <span>Bone marrow blasts explained</span>
+              </button>
+              <button
+                class="suggestion-card"
+                onclick="
+                  fillSuggestion(
+                    'What is the difference between benign and malignant tumors?',
+                  )
+                "
+              >
+                <i class="fas fa-flask"></i>
+                <span>Benign vs malignant tumors</span>
+              </button>
+              <button
+                class="suggestion-card"
+                onclick="fillSuggestion('What does a high WBC count indicate?')"
+              >
+                <i class="fas fa-vial"></i>
+                <span>High WBC count meaning</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="messages-list" id="messagesList"></div>
+      </main>
+
+      <!-- Input Bar -->
+      <div class="input-bar" id="inputBar">
+        <div class="input-shell">
+          <textarea
+            class="chat-input"
+            id="chatInput"
+            placeholder="Ask about cancer, symptoms, or test results…"
+            rows="1"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" title="Send message">
+            <i class="fas fa-arrow-up"></i>
+          </button>
+        </div>
+        <div class="input-tools">
+          <button
+            class="input-tool-btn"
+            onclick="window.location.href = '/blood_sample'"
+          >
+            <i class="fas fa-vial"></i>
+            <span>Blood Analysis</span>
+          </button>
+          <button
+            class="input-tool-btn"
+            onclick="window.location.href = '/image_detection'"
+          >
+            <i class="fas fa-microscope"></i>
+            <span>Skin Detection</span>
+          </button>
+          <span class="input-disclaimer"
+            >VCare AI is for informational purposes only — always consult a
+            doctor.</span
+          >
+        </div>
+      </div>
     </div>
 
+    <!-- Markdown and Code Highlighting Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-</body>
+  </body>
 </html>

@@ -98,10 +98,20 @@ def chat_endpoint():
             return jsonify({'error': 'Empty message'}), 400
         
         # Generate response using chat model module
-        response = chat_model.chat(user_message)
+        result = chat_model.chat(user_message)
         
+        # Handle greeting responses with choices
+        if result.get('is_greeting'):
+            return jsonify({
+                'is_greeting': True,
+                'choices': result.get('choices', []),
+                'status': 'success'
+            })
+        
+        # Handle regular responses
         return jsonify({
-            'response': response,
+            'response': result.get('response', 'No response generated'),
+            'is_greeting': False,
             'status': 'success'
         })
     
@@ -121,9 +131,26 @@ def chat_stream_endpoint():
         if not user_message.strip():
             return jsonify({'error': 'Empty message'}), 400
 
-        response_text = chat_model.chat(user_message)
+        result = chat_model.chat(user_message)
 
-        if response_text.startswith("Chat model could not be loaded right now."):
+        # Handle greeting responses with choices
+        if result.get('is_greeting'):
+            def greeting_stream():
+                # Stream greeting choices
+                for choice in result.get('choices', []):
+                    yield f"data: {json.dumps({'token': choice})}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return Response(
+                stream_with_context(greeting_stream()),
+                mimetype='text/event-stream',
+                headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+            )
+        
+        # Handle regular responses
+        response_text = result.get('response', 'No response generated')
+        
+        if "Chat model could not be loaded" in response_text:
             def error_stream():
                 yield f"data: {json.dumps({'error': response_text})}\n\n"
                 yield "data: [DONE]\n\n"
