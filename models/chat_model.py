@@ -3,6 +3,7 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
 import os
+import random
 
 
 class ChatModel:
@@ -24,6 +25,49 @@ class ChatModel:
             "do_sample": True,
             "return_full_text": False
         }
+        
+        # Greeting keywords and custom responses
+        self.greeting_keywords = ['hello', 'hi', 'hai', 'hey', 'greetings', 'howdy']
+        
+        self.greeting_responses = {
+            'friendly': [
+                "Hello! 👋 Welcome to VCare AI Medical Assistant. How can I help you with your health concerns today?",
+                "Hi there! 😊 I'm here to assist you with medical information and health guidance. What would you like to know?",
+                "Hey! Welcome! 🏥 I'm ready to help with any medical questions or health-related advice you might need."
+            ],
+            'professional': [
+                "Good day. I'm VCare AI Medical Assistant. How may I assist you with your healthcare needs?",
+                "Greetings. Welcome to VCare AI. Please tell me how I can help with your medical inquiries.",
+                "Welcome. I'm your AI medical advisor. What health information can I provide for you today?"
+            ],
+            'warm': [
+                "Welcome! 🤍 I hope you're doing well. I'm here to answer all your health and medical questions.",
+                "Hi! So glad you're here. 💙 Let's talk about your health and wellness. What's on your mind?",
+                "Hello friend! 🌟 VCare AI is at your service. How can I support your health journey today?"
+            ]
+        }
+    
+    def is_greeting(self, text):
+        """Check if the input text is a greeting"""
+        text_lower = text.strip().lower()
+        
+        # Check if it matches greeting keywords (exact or starts with)
+        for keyword in self.greeting_keywords:
+            if text_lower == keyword or text_lower.startswith(keyword):
+                return True
+        
+        return False
+    
+    def get_greeting_choices(self):
+        """Get 3 greeting response choices from different styles"""
+        choices = []
+        
+        # Select one response from each style
+        for style in ['friendly', 'professional', 'warm']:
+            response = random.choice(self.greeting_responses[style])
+            choices.append(response)
+        
+        return choices
     
     def load(self):
         """Load the chat model and pipeline"""
@@ -96,14 +140,29 @@ class ChatModel:
             return False
     
     def chat(self, prompt):
-        """Generate a chat response"""
+        """Generate a chat response or greeting choices"""
+        # Check if input is a greeting
+        if self.is_greeting(prompt):
+            return {
+                'is_greeting': True,
+                'choices': self.get_greeting_choices()
+            }
+        
+        # For non-greeting messages, use the full model
         if self.pipe is None:
             if not self.load():
-                return f"Chat model could not be loaded right now. {self.error or ''}".strip()
+                return {
+                    'is_greeting': False,
+                    'response': f"Chat model could not be loaded right now. {self.error or ''}".strip()
+                }
         
         messages = [{"role": "user", "content": prompt}]
         output = self.pipe(messages, **self.generation_args)
-        return output[0]['generated_text']
+        
+        return {
+            'is_greeting': False,
+            'response': output[0]['generated_text']
+        }
     
     def is_loaded(self):
         """Check if model is loaded"""
