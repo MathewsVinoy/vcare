@@ -782,7 +782,11 @@ body::before {
   max-width: 960px;
   margin: 0 auto;
   padding: 10px 24px 18px;
-  background: linear-gradient(to top, rgba(254, 245, 245, 0.98), rgba(254, 245, 245, 0.7));
+  background: linear-gradient(
+    to top,
+    rgba(254, 245, 245, 0.98),
+    rgba(254, 245, 245, 0.7)
+  );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   flex-shrink: 0;
