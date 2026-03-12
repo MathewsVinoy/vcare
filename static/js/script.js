@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function renderMarkdown(text) {
-    """Render markdown text to HTML with syntax highlighting"""
+    // Render markdown text to HTML with syntax highlighting
     let html = marked.parse(text);
     
     // Highlight code blocks
