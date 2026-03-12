@@ -23,7 +23,8 @@ tokenizer = AutoTokenizer.from_pretrained(
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     device_map="auto",
-    torch_dtype=torch.float16,  # Use float16 for efficiency
+    torch_dtype=torch.float16,
+    load_in_4bit=True,  # Use 4-bit quantization for efficiency
     trust_remote_code=False,  # Use transformers' built-in implementation
     cache_dir=cache_dir,
     attn_implementation="eager"  # Use eager attention for better compatibility
