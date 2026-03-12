@@ -1,10 +1,13 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import torchvision
+from torch import nn
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, TextIteratorStreamer
 from peft import PeftModel
 import os
+import threading
+import json
 import numpy as np
-import timm
 from torchvision import transforms
 from PIL import Image
 import io
@@ -21,6 +24,21 @@ cache_dir = os.path.join(os.path.dirname(__file__), "model_cache")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
+# CUDA optimizations
+if device.type == 'cuda':
+    torch.backends.cudnn.benchmark = True
+
+# Pre-built transform — created once and reused on every request
+IMAGE_TRANSFORM = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+])
+
+# Locks to prevent race conditions when multiple requests trigger model loading
+_blood_lock = threading.Lock()
+_image_lock = threading.Lock()
+_llm_lock   = threading.Lock()
+
 # Global variables for model and pipeline
 model = None
 tokenizer = None
@@ -31,60 +49,73 @@ image_model = None
 def load_blood_model():
     """Lazy load the blood sample model when needed"""
     global blood_model
-    
-    if blood_model is not None:
-        return True
-    
-    try:
-        import joblib
-        blood_model = joblib.load('model/random_forest_model.joblib')
-        print("✅ Blood sample model loaded successfully!")
-        return True
-    except ImportError as e:
-        print(f"❌ Import error: {e}")
-        print("Please install: pip install joblib scikit-learn")
-        return False
-    except FileNotFoundError:
-        print("❌ Model file not found at 'model/random_forest_model.joblib'")
-        return False
-    except Exception as e:
-        print(f"❌ Error loading blood model: {e}")
-        return False
 
-def get_skin_cancer_model(num_classes=2):
-    """Create EfficientFormer model architecture (same as training script)"""
-    model = timm.create_model(
-        "efficientformer_l1",
-        pretrained=False,
-        num_classes=num_classes
-    )
-    return model
+    if blood_model is not None:   # fast path — no lock needed
+        return True
+
+    with _blood_lock:             # one thread loads, others wait
+        if blood_model is not None:  # re-check after acquiring lock
+            return True
+        try:
+            import joblib
+            blood_model = joblib.load('model/random_forest_model.joblib')
+            print("✅ Blood sample model loaded successfully!")
+            return True
+        except ImportError as e:
+            print(f"❌ Import error: {e}")
+            print("Please install: pip install joblib scikit-learn")
+            return False
+        except FileNotFoundError:
+            print("❌ Model file not found at 'model/random_forest_model.joblib'")
+            return False
+        except Exception as e:
+            print(f"❌ Error loading blood model: {e}")
+            return False
+
+def get_vit_model(num_classes=2):
+    """Create ViT-B/16 architecture (same as training script)"""
+    vit = torchvision.models.vit_b_16(weights=None)
+    in_features = vit.heads.head.in_features
+    vit.heads.head = nn.Linear(in_features, num_classes)
+    return vit
 
 def load_image_model():
     """Lazy load the skin cancer detection model when needed"""
     global image_model
-    
-    if image_model is not None:
+
+    if image_model is not None:   # fast path — no lock needed
         return True
-    
-    try:
-        image_model = get_skin_cancer_model(num_classes=2)
-        image_model.load_state_dict(torch.load('model/efficientformer_model.pth', map_location=device))
-        image_model = image_model.to(device)
-        image_model.eval()
-        print(f"✅ Skin cancer detection model loaded successfully on {device}!")
-        return True
-    except FileNotFoundError:
-        print("❌ PyTorch model file not found at 'model/efficientformer_model.pth'")
-        return False
-    except Exception as e:
-        print(f"❌ Error loading image model: {e}")
-        return False
+
+    with _image_lock:             # one thread loads, others wait
+        if image_model is not None:
+            return True
+        try:
+            image_model = get_vit_model(num_classes=2)
+            image_model.load_state_dict(
+                torch.load('model/model.pth', map_location=device, weights_only=True)
+            )
+            image_model = image_model.to(device)
+            image_model.eval()
+            print(f"✅ Skin cancer detection model loaded successfully on {device}!")
+            return True
+        except FileNotFoundError:
+            print("❌ PyTorch model file not found at 'model/model.pth'")
+            return False
+        except Exception as e:
+            print(f"❌ Error loading image model: {e}")
+            return False
 
 def load_model():
     """Load the Phi-3 model with LoRA adapter"""
     global model, tokenizer, pipe
-    
+
+    if pipe is not None:   # fast path
+        return
+
+    with _llm_lock:
+        if pipe is not None:  # re-check after acquiring lock
+            return
+
     print("Loading Phi-3 base model with cancer diagnosis fine-tuning...")
     print(f"Base Model: {model_name}")
     print(f"LoRA Adapter: {lora_adapter_path}")
@@ -102,17 +133,19 @@ def load_model():
     offload_dir = os.path.join(os.path.dirname(__file__), "offload_dir")
     os.makedirs(offload_dir, exist_ok=True)
     
-    # Load base model
+    # Load base model — prefer sdpa (PyTorch scaled-dot-product attention) for speed
+    _attn_impl = "sdpa" if hasattr(torch.nn.functional, "scaled_dot_product_attention") else "eager"
     base_model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch.float16,
         trust_remote_code=False,
         cache_dir=cache_dir,
-        attn_implementation="eager",
+        attn_implementation=_attn_impl,
         low_cpu_mem_usage=True,
         device_map="auto",
         offload_folder=offload_dir
     )
+    print(f"Using attention implementation: {_attn_impl}")
     
     # Load LoRA adapter weights on top of base model
     model = PeftModel.from_pretrained(
@@ -141,10 +174,10 @@ def chat(prompt):
     ]
     
     generation_args = {
-        "max_new_tokens": 500,
+        "max_new_tokens": 300,
         "return_full_text": False,
-        "temperature": 0.7,
-        "do_sample": True,
+        "do_sample": False,
+        "repetition_penalty": 1.1,
     }
     
     output = pipe(messages, **generation_args)
@@ -191,7 +224,7 @@ def predict_blood_sample():
         ]
         
         # Convert to numpy array with shape (1, 12)
-        features_array = np.array([features])
+        features_array = np.array([features], dtype=np.float32)
         
         # Make prediction
         prediction = int(blood_model.predict(features_array)[0])
@@ -254,6 +287,66 @@ def chat_endpoint():
             'status': 'error'
         }), 500
 
+@app.route('/chat/stream', methods=['POST'])
+def chat_stream():
+    """Stream chat response token-by-token via Server-Sent Events"""
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '')
+
+        if not user_message.strip():
+            return jsonify({'error': 'Empty message'}), 400
+
+        if pipe is None:
+            return jsonify({'error': 'Model not loaded. Please wait…'}), 503
+
+        messages = [{"role": "user", "content": user_message}]
+
+        streamer = TextIteratorStreamer(
+            tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+            timeout=30.0,
+        )
+
+        generation_kwargs = {
+            "max_new_tokens": 300,
+            "return_full_text": False,
+            "do_sample": False,
+            "repetition_penalty": 1.1,
+            "streamer": streamer,
+        }
+
+        # Run generation in a background thread so we can stream tokens
+        gen_thread = threading.Thread(
+            target=lambda: pipe(messages, **generation_kwargs),
+            daemon=True,
+        )
+        gen_thread.start()
+
+        def generate():
+            try:
+                for token in streamer:
+                    if token:
+                        yield f"data: {json.dumps({'token': token})}\n\n"
+            except Exception as exc:
+                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+            finally:
+                yield "data: [DONE]\n\n"
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'status': 'error'}), 500
+
+
 @app.route('/health')
 def health():
     """Check if the model is loaded"""
@@ -268,7 +361,7 @@ def predict_skin_cancer():
         # Lazy load image model only when needed
         if not load_image_model():
             return jsonify({
-                'error': 'Image model not loaded. Please check if model/efficientformer_model.pth exists.',
+                'error': 'Image model not loaded. Please check if model/model.pth exists.',
                 'success': False
             }), 500
             
@@ -283,18 +376,17 @@ def predict_skin_cancer():
         # Read and preprocess the image
         image_bytes = file.read()
         image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-        
-        # Apply the same transforms used during training
-        transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-        ])
-        
-        image_tensor = transform(image).unsqueeze(0).to(device)
-        
-        # Make prediction
-        with torch.no_grad():
-            outputs = image_model(image_tensor)
+
+        # Reuse the pre-built global transform (no object creation per request)
+        image_tensor = IMAGE_TRANSFORM(image).unsqueeze(0).to(device)
+
+        # torch.inference_mode is faster than torch.no_grad (disables more overhead)
+        with torch.inference_mode():
+            if device.type == 'cuda':
+                with torch.cuda.amp.autocast():
+                    outputs = image_model(image_tensor)
+            else:
+                outputs = image_model(image_tensor)
             probabilities = torch.softmax(outputs, dim=1)[0]
             prediction = torch.argmax(probabilities).item()
             cancer_probability = probabilities[1].item() * 100  # Class 1 is cancer
