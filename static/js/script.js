@@ -75,8 +75,8 @@ document.addEventListener("DOMContentLoaded", () => {
     triggerSend();
   };
 
-  // -- Send message flow --
-  function sendMessage(text) {
+  // -- Send message flow (streaming) --
+  async function sendMessage(text) {
     if (!chatStarted) {
       chatStarted = true;
       welcomeScreen.style.display = "none";
@@ -85,27 +85,59 @@ document.addEventListener("DOMContentLoaded", () => {
 
     appendMessage(text, "user");
     const typingEl = appendTyping();
+    let bubble = null;
 
-    fetch("/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        removeTyping(typingEl);
-        appendMessage(
-          d.response || "Sorry, I couldn't generate a response.",
-          "assistant",
-        );
-      })
-      .catch(() => {
-        removeTyping(typingEl);
+    try {
+      const response = await fetch("/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+
+      if (!response.ok) throw new Error("Server error");
+
+      removeTyping(typingEl);
+      const msgEl = appendMessage("", "assistant");
+      bubble = msgEl.querySelector(".msg-bubble");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop(); // keep any incomplete line for the next chunk
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]") return;
+          try {
+            const parsed = JSON.parse(payload);
+            if (parsed.token) {
+              bubble.textContent += parsed.token;
+              scrollToBottom();
+            } else if (parsed.error) {
+              bubble.textContent = "Error: " + parsed.error;
+            }
+          } catch (_) {
+            /* skip malformed lines */
+          }
+        }
+      }
+    } catch (_) {
+      removeTyping(typingEl);
+      if (!bubble) {
         appendMessage(
           "Connection error. Please ensure the server is running and the model is loaded.",
           "assistant",
         );
-      });
+      }
+    }
   }
 
   function appendMessage(text, role) {
