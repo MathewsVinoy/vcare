@@ -12,6 +12,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let chatStarted = false;
 
+  function updateSendButtonState() {
+    sendBtn.disabled = !chatInput.value.trim();
+  }
+
   // -- Sidebar --
   sidebarToggle?.addEventListener("click", () =>
     sidebar.classList.toggle("collapsed"),
@@ -48,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
   chatInput.addEventListener("input", () => {
     chatInput.style.height = "auto";
     chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + "px";
+    updateSendButtonState();
   });
 
   // -- Send on Enter (Shift+Enter = newline) --
@@ -65,6 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!msg) return;
     chatInput.value = "";
     chatInput.style.height = "auto";
+    updateSendButtonState();
     sendMessage(msg);
   }
 
@@ -162,16 +168,16 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function renderMarkdown(text) {
-    """Render markdown text to HTML with syntax highlighting"""
+    // Render markdown text to HTML with syntax highlighting
     let html = marked.parse(text);
-    
+
     // Highlight code blocks
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    doc.querySelectorAll('pre code').forEach((block) => {
+    const doc = parser.parseFromString(html, "text/html");
+    doc.querySelectorAll("pre code").forEach((block) => {
       hljs.highlightElement(block);
     });
-    
+
     return doc.body.innerHTML;
   }
 
@@ -186,9 +192,16 @@ document.addEventListener("DOMContentLoaded", () => {
         ? '<i class="fas fa-user"></i>'
         : '<i class="fas fa-robot"></i>';
 
+    const body = document.createElement("div");
+    body.className = "message-body";
+
+    const label = document.createElement("div");
+    label.className = "msg-label";
+    label.textContent = role === "user" ? "You" : "VCare AI";
+
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
-    
+
     // Render markdown for assistant messages, plain text for user messages
     if (role === "assistant" && text.trim()) {
       bubble.innerHTML = renderMarkdown(text);
@@ -196,30 +209,10 @@ document.addEventListener("DOMContentLoaded", () => {
       bubble.textContent = text;
     }
 
+    body.appendChild(label);
+    body.appendChild(bubble);
     msgEl.appendChild(avatar);
-    msgEl.appendChild(bubble);
-    messagesList.appendChild(msgEl);
-    scrollToBottom();
-    return msgEl;
-  }
-
-  function appendMessage_OLD(text, role) {
-    const msgEl = document.createElement("div");
-    msgEl.className = `message ${role}`;
-
-    const avatar = document.createElement("div");
-    avatar.className = "msg-avatar";
-    avatar.innerHTML =
-      role === "user"
-        ? '<i class="fas fa-user"></i>'
-        : '<i class="fas fa-robot"></i>';
-
-    const bubble = document.createElement("div");
-    bubble.className = "msg-bubble";
-    bubble.textContent = text;
-
-    msgEl.appendChild(avatar);
-    msgEl.appendChild(bubble);
+    msgEl.appendChild(body);
     messagesList.appendChild(msgEl);
     scrollToBottom();
     return msgEl;
@@ -234,6 +227,13 @@ document.addEventListener("DOMContentLoaded", () => {
     avatar.className = "msg-avatar";
     avatar.innerHTML = '<i class="fas fa-robot"></i>';
 
+    const body = document.createElement("div");
+    body.className = "message-body";
+
+    const label = document.createElement("div");
+    label.className = "msg-label";
+    label.textContent = "VCare AI";
+
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
     bubble.innerHTML = `
@@ -243,8 +243,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="typing-dot"></div>
             </div>`;
 
+    body.appendChild(label);
+    body.appendChild(bubble);
     msgEl.appendChild(avatar);
-    msgEl.appendChild(bubble);
+    msgEl.appendChild(body);
     messagesList.appendChild(msgEl);
     scrollToBottom();
     return msgEl;
@@ -258,4 +260,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatArea = document.getElementById("chatArea");
     chatArea.scrollTop = chatArea.scrollHeight;
   }
+
+  updateSendButtonState();
 });
