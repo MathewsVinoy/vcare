@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
 import os
 
 # Model configuration
@@ -19,13 +19,33 @@ tokenizer = AutoTokenizer.from_pretrained(
     cache_dir=cache_dir
 )
 
-# Load model (4-bit for lower memory)
+# Configure quantization with CPU offload support (8-bit is often more stable for offloading)
+quantization_config = BitsAndBytesConfig(
+    load_in_8bit=True,
+    llm_int8_enable_fp32_cpu_offload=True
+)
+
+# Offload directory
+offload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "offload"))
+os.makedirs(offload_dir, exist_ok=True)
+
+# Calculate max memory to prevent over-allocation on GPU
+if torch.cuda.is_available():
+    # Use a conservative GPU budget to avoid meta-tensor issues
+    max_memory = {0: "2GiB", "cpu": "12GiB"}
+    print(f"Setting GPU budget to {max_memory[0]} and CPU budget to {max_memory['cpu']}")
+else:
+    max_memory = None
+
+# Load model (8-bit with CPU offloading)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     device_map="auto",
-    load_in_4bit=True,        # reduces memory usage
-    torch_dtype=torch.float16,
-    cache_dir=cache_dir
+    max_memory=max_memory,
+    quantization_config=quantization_config,
+    torch_dtype=torch.float16, # Better for memory than default float32
+    cache_dir=cache_dir,
+    offload_folder=offload_dir
 )
 
 print("Model loaded successfully!")
