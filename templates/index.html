@@ -82,7 +82,7 @@
         <button class="topbar-menu-btn" id="mobileMenuBtn">
           <i class="fas fa-bars"></i>
         </button>
-        <div class="topbar-title">AI Chat</div>
+        <div class="topbar-title">VCare AI</div>
         <div class="topbar-status" id="modelStatus">
           <span class="status-dot"></span>
           <span class="status-text">Checking…</span>
@@ -102,10 +102,11 @@
             <div class="welcome-icon">
               <i class="fas fa-dna"></i>
             </div>
-            <h1 class="welcome-heading">How can I assist you today?</h1>
+            <h1 class="welcome-heading">How can I help you today?</h1>
             <p class="welcome-sub">
-              Ask me anything about cancer diagnosis, symptoms, treatment
-              options, or use the tools in the sidebar for detailed analysis.
+              Ask about cancer, symptoms, lab reports, treatment options, or
+              general medical concerns. I will keep the answers focused and easy
+              to read.
             </p>
 
             <div class="suggestion-grid">
@@ -116,7 +117,7 @@
                 "
               >
                 <i class="fas fa-search-plus"></i>
-                <span>Early symptoms of leukemia</span>
+                <span>What are the early symptoms of leukemia?</span>
               </button>
               <button
                 class="suggestion-card"
@@ -127,7 +128,7 @@
                 "
               >
                 <i class="fas fa-bone"></i>
-                <span>Bone marrow blasts explained</span>
+                <span>Explain bone marrow blasts percentage</span>
               </button>
               <button
                 class="suggestion-card"
@@ -138,14 +139,14 @@
                 "
               >
                 <i class="fas fa-flask"></i>
-                <span>Benign vs malignant tumors</span>
+                <span>Difference between benign and malignant tumors</span>
               </button>
               <button
                 class="suggestion-card"
                 onclick="fillSuggestion('What does a high WBC count indicate?')"
               >
                 <i class="fas fa-vial"></i>
-                <span>High WBC count meaning</span>
+                <span>What does a high WBC count indicate?</span>
               </button>
             </div>
           </div>
@@ -161,12 +162,19 @@
           <textarea
             class="chat-input"
             id="chatInput"
-            placeholder="Ask about cancer, symptoms, or test results…"
+            placeholder="Message VCare AI"
             rows="1"
           ></textarea>
           <button class="send-btn" id="sendBtn" title="Send message">
             <i class="fas fa-arrow-up"></i>
           </button>
+        </div>
+        <div class="composer-meta">
+          <span
+            >Ask about cancer, health symptoms, reports, or treatment
+            guidance.</span
+          >
+          <span>Enter to send · Shift + Enter for a new line</span>
         </div>
         <div class="input-tools">
           <button
