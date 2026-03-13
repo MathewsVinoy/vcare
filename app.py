@@ -188,7 +188,23 @@ def predict_skin_cancer():
         }), 500
 
 if __name__ == '__main__':
-    chat_model.initialize(preload_main=chat_model.can_preload_main_model())
+    preload_setting = os.getenv('PRELOAD_CHAT_MODEL', 'auto').strip().lower()
+    if preload_setting in {'1', 'true', 'yes', 'on'}:
+        preload_main = True
+    elif preload_setting in {'0', 'false', 'no', 'off'}:
+        preload_main = False
+    else:
+        preload_main = chat_model.can_preload_main_model()
+
+    chat_model.initialize(preload_main=preload_main)
+
+    debug_mode = os.getenv('FLASK_DEBUG', '0').strip() == '1'
 
     # Run the Flask app
-    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
+    app.run(
+        debug=debug_mode,
+        use_reloader=False,
+        threaded=True,
+        host='0.0.0.0',
+        port=5000,
+    )
