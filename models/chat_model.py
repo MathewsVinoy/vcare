@@ -1,26 +1,49 @@
 """Phi-3 Chat Model Module"""
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    TextIteratorStreamer,
+    pipeline,
+)
 import os
 import random
 import re
 from collections import OrderedDict
+from threading import Thread
+
+import psutil
 
 
 class ChatModel:
-    """Load and manage the Phi-3 chat model with quantization and offloading"""
-    
-    def __init__(self, model_name="microsoft/Phi-3-mini-4k-instruct", cache_dir=None, offload_dir=None):
+    """Load and manage the chat stack with lightweight routing and Phi-3 generation."""
+
+    def __init__(
+        self,
+        model_name="microsoft/Phi-3-mini-4k-instruct",
+        router_model_name="google/flan-t5-small",
+        cache_dir=None,
+        offload_dir=None,
+    ):
         self.model_name = model_name
-        self.cache_dir = cache_dir or os.path.join(os.path.dirname(__file__), "../model_cache")
-        self.offload_dir = offload_dir or os.path.join(os.path.dirname(__file__), "../offload_dir")
-        
+        self.router_model_name = router_model_name
+        self.cache_dir = os.path.abspath(cache_dir or os.path.join(os.path.dirname(__file__), "../model_cache"))
+        self.offload_dir = os.path.abspath(offload_dir or os.path.join(os.path.dirname(__file__), "../offload_dir"))
+        self.router_cache_dir = self.cache_dir
+
         self.model = None
         self.tokenizer = None
         self.pipe = None
         self.error = None
-        
+
+        self.router_model = None
+        self.router_tokenizer = None
+        self.router_pipe = None
+        self.router_error = None
+
         self.generation_args = {
             "max_new_tokens": 220,
             "do_sample": False,
@@ -99,6 +122,11 @@ class ChatModel:
             re.compile(r'^[bcdfghjklmnpqrstvwxyz]{5,}$')
         ]
 
+    def _chunk_text(self, text, chunk_size=28):
+        """Yield small chunks for non-model streaming responses."""
+        for i in range(0, len(text), chunk_size):
+            yield text[i:i + chunk_size]
+
     def _compile_keyword_patterns(self, keywords):
         """Compile keyword regex patterns once for faster matching."""
         return [re.compile(r'(?<!\w)' + re.escape(keyword) + r'(?!\w)') for keyword in keywords]
@@ -116,6 +144,11 @@ class ChatModel:
         self.response_cache.move_to_end(prompt)
         if len(self.response_cache) > self.max_cached_responses:
             self.response_cache.popitem(last=False)
+
+    def _count_pattern_matches(self, text, patterns):
+        """Count the number of pattern hits for a prompt."""
+        text_lower = self._normalize_text(text)
+        return sum(1 for pattern in patterns if pattern.search(text_lower))
     
     def is_greeting(self, text):
         """Check if the input text is a greeting"""
@@ -197,9 +230,112 @@ class ChatModel:
 
         return any(pattern.fullmatch(text_lower) for pattern in self.random_patterns)
 
-    def build_domain_prompt(self, prompt):
+    def lightweight_classify(self, text):
+        """Fast rule-based classifier before using the router model."""
+        if self.is_random_text(text):
+            return "non-medical"
+
+        if self.is_math_related(text) and not self.is_medical_related(text):
+            return "non-medical"
+
+        cancer_hits = self._count_pattern_matches(text, self.cancer_patterns)
+        medical_hits = self._count_pattern_matches(text, self.medical_patterns)
+
+        if cancer_hits > 0:
+            return "cancer"
+
+        if medical_hits > 0:
+            return "medical"
+
+        return "unknown"
+
+    def load_router(self):
+        """Load a small instruct model for routing ambiguous prompts."""
+        if self.router_model is not None and self.router_tokenizer is not None and self.router_pipe is not None:
+            return True
+
+        try:
+            self.router_error = None
+            os.makedirs(self.router_cache_dir, exist_ok=True)
+
+            self.router_tokenizer = AutoTokenizer.from_pretrained(
+                self.router_model_name,
+                cache_dir=self.router_cache_dir,
+                trust_remote_code=False
+            )
+            self.router_model = AutoModelForSeq2SeqLM.from_pretrained(
+                self.router_model_name,
+                cache_dir=self.router_cache_dir,
+                trust_remote_code=False
+            )
+            self.router_model.eval()
+            self.router_pipe = pipeline(
+                "text2text-generation",
+                model=self.router_model,
+                tokenizer=self.router_tokenizer,
+                device=-1,
+            )
+            return True
+        except Exception as e:
+            self.router_model = None
+            self.router_tokenizer = None
+            self.router_pipe = None
+            self.router_error = str(e)
+            return False
+
+    def route_with_small_model(self, prompt):
+        """Use the small instruct model to classify ambiguous prompts."""
+        if not self.load_router():
+            return "non-medical"
+
+        router_prompt = (
+            "Classify the user message into exactly one label: cancer, medical, or non-medical. "
+            "Return only the label.\n"
+            f"Message: {prompt}\n"
+            "Label:"
+        )
+
+        try:
+            output = self.router_pipe(
+                router_prompt,
+                max_new_tokens=4,
+                do_sample=False,
+                truncation=True,
+            )[0]["generated_text"].strip().lower()
+        except Exception:
+            return "non-medical"
+
+        if "non-medical" in output:
+            return "non-medical"
+        if "cancer" in output:
+            return "cancer"
+        if "medical" in output:
+            return "medical"
+        return "non-medical"
+
+    def classify_prompt(self, prompt):
+        """Classify the prompt domain using rules, then the small router if needed."""
+        label = self.lightweight_classify(prompt)
+        if label != "unknown":
+            return label
+        return self.route_with_small_model(prompt)
+
+    def can_preload_main_model(self):
+        """Check whether the main model can be loaded eagerly based on available memory."""
+        available_gb = psutil.virtual_memory().available / (1024 ** 3)
+        if torch.cuda.is_available():
+            return available_gb >= 10
+        return available_gb >= 20
+
+    def initialize(self, preload_main=False):
+        """Initialize router first, and optionally preload the main model."""
+        self.load_router()
+        if preload_main:
+            self.load()
+
+    def build_domain_prompt(self, prompt, label):
         """Add a domain instruction based on the detected topic."""
-        if self.is_cancer_related(prompt):
+        if label == "cancer":
             domain_instruction = (
                 "You are VCare AI, a cancer-focused medical assistant. "
                 "Answer only in the context of cancer, oncology, diagnosis support, symptoms, screening, reports, "
@@ -217,6 +353,46 @@ class ChatModel:
             {"role": "system", "content": domain_instruction},
             {"role": "user", "content": prompt}
         ]
+
+    def _prepare_prompt(self, prompt):
+        """Resolve greeting, cached, rejected, or model-backed prompt handling."""
+        normalized_prompt = self._normalize_text(prompt)
+
+        if self.is_greeting(normalized_prompt):
+            result = {
+                'is_greeting': True,
+                'choices': self.get_greeting_choices()
+            }
+            self._cache_response(normalized_prompt, result)
+            return {"mode": "final", "cache_key": normalized_prompt, "result": result}
+
+        cached_response = self._get_cached_response(normalized_prompt)
+        if cached_response is not None:
+            return {"mode": "final", "cache_key": normalized_prompt, "result": cached_response}
+
+        label = self.classify_prompt(prompt)
+        if label == "non-medical":
+            result = {
+                'is_greeting': False,
+                'response': self.out_of_scope_message
+            }
+            self._cache_response(normalized_prompt, result)
+            return {"mode": "final", "cache_key": normalized_prompt, "result": result}
+
+        if self.pipe is None and not self.load():
+            result = {
+                'is_greeting': False,
+                'response': f"Chat model could not be loaded right now. {self.error or ''}".strip()
+            }
+            self._cache_response(normalized_prompt, result)
+            return {"mode": "final", "cache_key": normalized_prompt, "result": result}
+
+        return {
+            "mode": "generate",
+            "cache_key": normalized_prompt,
+            "label": label,
+            "messages": self.build_domain_prompt(prompt, label),
+        }
     
     def load(self):
         """Load the chat model and pipeline"""
@@ -291,65 +467,69 @@ class ChatModel:
     
     def chat(self, prompt):
         """Generate a chat response or greeting choices"""
-        normalized_prompt = self._normalize_text(prompt)
+        prepared = self._prepare_prompt(prompt)
+        if prepared["mode"] == "final":
+            return prepared["result"]
 
-        # Check if input is a greeting
-        if self.is_greeting(normalized_prompt):
-            result = {
-                'is_greeting': True,
-                'choices': self.get_greeting_choices()
-            }
-            self._cache_response(normalized_prompt, result)
-            return result
-
-        cached_response = self._get_cached_response(normalized_prompt)
-        if cached_response is not None:
-            return cached_response
-
-        if self.is_random_text(normalized_prompt) and not self.is_medical_related(normalized_prompt):
-            result = {
-                'is_greeting': False,
-                'response': self.out_of_scope_message
-            }
-            self._cache_response(normalized_prompt, result)
-            return result
-
-        if self.is_math_related(normalized_prompt) and not self.is_medical_related(normalized_prompt):
-            result = {
-                'is_greeting': False,
-                'response': self.out_of_scope_message
-            }
-            self._cache_response(normalized_prompt, result)
-            return result
-
-        # Reject prompts outside the medical/cancer domain
-        if not self.is_medical_related(normalized_prompt):
-            result = {
-                'is_greeting': False,
-                'response': self.out_of_scope_message
-            }
-            self._cache_response(normalized_prompt, result)
-            return result
-        
-        # For non-greeting messages, use the full model
-        if self.pipe is None:
-            if not self.load():
-                result = {
-                    'is_greeting': False,
-                    'response': f"Chat model could not be loaded right now. {self.error or ''}".strip()
-                }
-                self._cache_response(normalized_prompt, result)
-                return result
-        
-        messages = self.build_domain_prompt(prompt)
+        messages = prepared["messages"]
         output = self.pipe(messages, **self.generation_args)
 
         result = {
             'is_greeting': False,
             'response': output[0]['generated_text']
         }
-        self._cache_response(normalized_prompt, result)
+        self._cache_response(prepared["cache_key"], result)
         return result
+
+    def stream_chat(self, prompt):
+        """Stream responses directly from the model when generation is needed."""
+        prepared = self._prepare_prompt(prompt)
+
+        if prepared["mode"] == "final":
+            result = prepared["result"]
+            if result.get("is_greeting"):
+                choices = result.get("choices", [])
+                intro = "Here are a few ways I can help you get started:\n\n"
+                yield {"token": intro}
+                for index, choice in enumerate(choices, start=1):
+                    prefix = f"{index}. "
+                    suffix = "\n\n" if index < len(choices) else ""
+                    yield {"token": f"{prefix}{choice}{suffix}"}
+            else:
+                for chunk in self._chunk_text(result.get("response", "")):
+                    yield {"token": chunk}
+            return
+
+        streamer = TextIteratorStreamer(
+            self.tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+        )
+        generation_kwargs = {
+            **self.generation_args,
+            "streamer": streamer,
+        }
+
+        worker = Thread(
+            target=self.pipe,
+            args=(prepared["messages"],),
+            kwargs=generation_kwargs,
+            daemon=True,
+        )
+        worker.start()
+
+        generated_parts = []
+        for token in streamer:
+            generated_parts.append(token)
+            yield {"token": token}
+
+        worker.join()
+
+        result = {
+            'is_greeting': False,
+            'response': ''.join(generated_parts).strip()
+        }
+        self._cache_response(prepared["cache_key"], result)
     
     def is_loaded(self):
         """Check if model is loaded"""
