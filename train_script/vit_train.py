@@ -41,17 +41,43 @@ class SkinCancerDataset(Dataset):
 
         return image, label
 
-transform = transforms.Compose([
+train_transform = transforms.Compose([
+    transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomVerticalFlip(p=0.2),
+    transforms.RandomRotation(20),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+test_transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
 dataset = SkinCancerDataset(
     csv_file="../data/HAM10000_metadata.csv",
     img_dir="../data/HAM10000_images_part_1/",  # path to folder with .jpg images
-    transform=transform
+    transform=None
 )
 BATCH_SIZE = 32
+
+
+class TransformedSubset(Dataset):
+    def __init__(self, subset, transform=None):
+        self.subset = subset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.subset)
+
+    def __getitem__(self, idx):
+        image, label = self.subset[idx]
+        if self.transform:
+            image = self.transform(image)
+        return image, label
 
 # ========================
 # Train-Test Split
@@ -62,6 +88,9 @@ from torch.utils.data import DataLoader, random_split
 train_size = int(0.8 * len(dataset))
 test_size = len(dataset) - train_size
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+train_dataset = TransformedSubset(train_dataset, transform=train_transform)
+test_dataset = TransformedSubset(test_dataset, transform=test_transform)
 
 train_dataloader = DataLoader(
     dataset=train_dataset,
