@@ -13,16 +13,6 @@ chat_model = ChatModel()
 blood_model = BloodModel()
 image_model = ImageModel()
 
-
-
-def stream_chat_response(response_text):
-    """Yield chat output in SSE format for the frontend."""
-    chunk_size = 24
-    for i in range(0, len(response_text), chunk_size):
-        chunk = response_text[i:i + chunk_size]
-        yield f"data: {json.dumps({'token': chunk})}\n\n"
-    yield "data: [DONE]\n\n"
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -131,38 +121,16 @@ def chat_stream_endpoint():
         if not user_message.strip():
             return jsonify({'error': 'Empty message'}), 400
 
-        result = chat_model.chat(user_message)
-
-        # Handle greeting responses with choices
-        if result.get('is_greeting'):
-            def greeting_stream():
-                # Stream greeting choices
-                for choice in result.get('choices', []):
-                    yield f"data: {json.dumps({'token': choice})}\n\n"
-                yield "data: [DONE]\n\n"
-
-            return Response(
-                stream_with_context(greeting_stream()),
-                mimetype='text/event-stream',
-                headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
-            )
-        
-        # Handle regular responses
-        response_text = result.get('response', 'No response generated')
-        
-        if "Chat model could not be loaded" in response_text:
-            def error_stream():
-                yield f"data: {json.dumps({'error': response_text})}\n\n"
-                yield "data: [DONE]\n\n"
-
-            return Response(
-                stream_with_context(error_stream()),
-                mimetype='text/event-stream',
-                headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
-            )
+        def token_stream():
+            for event in chat_model.stream_chat(user_message):
+                if event.get('error'):
+                    yield f"data: {json.dumps({'error': event['error']})}\n\n"
+                elif event.get('token'):
+                    yield f"data: {json.dumps({'token': event['token']})}\n\n"
+            yield "data: [DONE]\n\n"
 
         return Response(
-            stream_with_context(stream_chat_response(response_text)),
+            stream_with_context(token_stream()),
             mimetype='text/event-stream',
             headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
         )
@@ -184,7 +152,8 @@ def health():
     return jsonify({
         'status': 'ready' if chat_model.is_loaded() else 'loading',
         'model_loaded': chat_model.is_loaded(),
-        'error': chat_model.error
+        'router_loaded': chat_model.router_pipe is not None,
+        'error': chat_model.error or chat_model.router_error
     })
 
 @app.route('/predict_skin_cancer', methods=['POST'])
@@ -219,5 +188,7 @@ def predict_skin_cancer():
         }), 500
 
 if __name__ == '__main__':
+    chat_model.initialize(preload_main=chat_model.can_preload_main_model())
+
     # Run the Flask app
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
