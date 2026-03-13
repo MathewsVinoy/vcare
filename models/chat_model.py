@@ -13,6 +13,8 @@ import os
 import random
 import re
 from collections import OrderedDict
+from contextlib import nullcontext
+from threading import Lock
 from threading import Thread
 
 import psutil
@@ -48,7 +50,8 @@ class ChatModel:
             "max_new_tokens": 220,
             "do_sample": False,
             "return_full_text": False,
-            "repetition_penalty": 1.08
+            "repetition_penalty": 1.08,
+            "use_cache": True,
         }
         
         # Greeting keywords and custom responses
@@ -105,6 +108,7 @@ class ChatModel:
 
         self.max_cached_responses = 128
         self.response_cache = OrderedDict()
+        self.generation_lock = Lock()
 
         self.cancer_patterns = self._compile_keyword_patterns(self.cancer_keywords)
         self.medical_patterns = self._compile_keyword_patterns(self.medical_keywords)
@@ -121,6 +125,29 @@ class ChatModel:
             re.compile(r'^(.)\1{4,}$'),
             re.compile(r'^[bcdfghjklmnpqrstvwxyz]{5,}$')
         ]
+
+    def tune_runtime(self):
+        """Apply runtime-only performance tuning (no model change)."""
+        try:
+            cpu_count = os.cpu_count() or 2
+            torch.set_num_threads(max(1, min(8, cpu_count // 2)))
+            torch.set_num_interop_threads(1)
+        except Exception:
+            pass
+
+        if torch.cuda.is_available():
+            try:
+                torch.backends.cudnn.benchmark = True
+            except Exception:
+                pass
+            try:
+                torch.backends.cuda.matmul.allow_tf32 = True
+            except Exception:
+                pass
+            try:
+                torch.set_float32_matmul_precision("high")
+            except Exception:
+                pass
 
     def _chunk_text(self, text, chunk_size=28):
         """Yield small chunks for non-model streaming responses."""
@@ -315,6 +342,12 @@ class ChatModel:
 
     def classify_prompt(self, prompt):
         """Classify the prompt domain using rules, then the small router if needed."""
+        normalized_prompt = self._normalize_text(prompt)
+
+        # Strict fast-path gate for obviously out-of-domain long prompts.
+        if len(normalized_prompt) > 220 and not self.is_medical_related(normalized_prompt):
+            return "non-medical"
+
         label = self.lightweight_classify(prompt)
         if label != "unknown":
             return label
@@ -329,9 +362,29 @@ class ChatModel:
 
     def initialize(self, preload_main=False):
         """Initialize router first, and optionally preload the main model."""
+        self.tune_runtime()
         self.load_router()
         if preload_main:
-            self.load()
+            if self.load():
+                self.warmup()
+
+    def warmup(self):
+        """Run a tiny warmup pass to reduce first-token latency."""
+        if self.pipe is None:
+            return
+
+        try:
+            warmup_messages = self.build_domain_prompt("What is cancer?", "cancer")
+            self.pipe(
+                warmup_messages,
+                max_new_tokens=8,
+                do_sample=False,
+                return_full_text=False,
+                use_cache=True,
+            )
+        except Exception:
+            # Warmup failure should never block server startup.
+            pass
 
     def build_domain_prompt(self, prompt, label):
         """Add a domain instruction based on the detected topic."""
@@ -472,7 +525,10 @@ class ChatModel:
             return prepared["result"]
 
         messages = prepared["messages"]
-        output = self.pipe(messages, **self.generation_args)
+        inference_context = torch.inference_mode if hasattr(torch, "inference_mode") else nullcontext
+        with self.generation_lock:
+            with inference_context():
+                output = self.pipe(messages, **self.generation_args)
 
         result = {
             'is_greeting': False,
@@ -510,20 +566,24 @@ class ChatModel:
             "streamer": streamer,
         }
 
-        worker = Thread(
-            target=self.pipe,
-            args=(prepared["messages"],),
-            kwargs=generation_kwargs,
-            daemon=True,
-        )
-        worker.start()
+        def _run_generation():
+            inference_context = torch.inference_mode if hasattr(torch, "inference_mode") else nullcontext
+            with inference_context():
+                self.pipe(prepared["messages"], **generation_kwargs)
 
-        generated_parts = []
-        for token in streamer:
-            generated_parts.append(token)
-            yield {"token": token}
+        with self.generation_lock:
+            worker = Thread(
+                target=_run_generation,
+                daemon=True,
+            )
+            worker.start()
 
-        worker.join()
+            generated_parts = []
+            for token in streamer:
+                generated_parts.append(token)
+                yield {"token": token}
+
+            worker.join()
 
         result = {
             'is_greeting': False,
