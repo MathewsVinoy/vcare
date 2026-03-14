@@ -9,9 +9,9 @@ from torchvision import transforms
 import timm
 
 class SkinCancerDataset(Dataset):
-    def __init__(self, csv_file, img_dir, transform=None):
+    def __init__(self, csv_file, img_dirs, transform=None):
         self.data = pd.read_csv(csv_file)
-        self.img_dir = img_dir
+        self.img_dirs = img_dirs if isinstance(img_dirs, list) else [img_dirs]
         self.transform = transform
 
         # Map the 7 labels to binary (0 = no_cancer, 1 = cancer)
@@ -24,14 +24,27 @@ class SkinCancerDataset(Dataset):
             "df": 0,
             "vasc": 0
         }
+        
+        # Pre-calculate labels for weighted loss calculation later if needed
+        self.labels = [self.label_map[dx] for dx in self.data['dx']]
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
-        img_name = row['image_id'] + ".jpg"  # Change if png/jpeg differs
-        img_path = os.path.join(self.img_dir, img_name)
+        img_name = row['image_id'] + ".jpg"
+        
+        # Search in all directories
+        img_path = None
+        for d in self.img_dirs:
+            potential_path = os.path.join(d, img_name)
+            if os.path.exists(potential_path):
+                img_path = potential_path
+                break
+        
+        if img_path is None:
+            raise FileNotFoundError(f"Image {img_name} not found in any of {self.img_dirs}")
 
         image = Image.open(img_path).convert("RGB")
         label = self.label_map[row['dx']]
@@ -41,25 +54,9 @@ class SkinCancerDataset(Dataset):
 
         return image, label
 
-train_transform = transforms.Compose([
-    transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomVerticalFlip(p=0.2),
-    transforms.RandomRotation(20),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
-
-test_transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
-
 dataset = SkinCancerDataset(
     csv_file="../data/HAM10000_metadata.csv",
-    img_dir="../data/HAM10000_images_part_1/",  # path to folder with .jpg images
+    img_dirs=["../data/HAM10000_images_part_1/", "../data/HAM10000_images_part_2/"],
     transform=None
 )
 BATCH_SIZE = 32
@@ -82,40 +79,48 @@ class TransformedSubset(Dataset):
 # ========================
 # Train-Test Split
 # ========================
-from torch.utils.data import DataLoader, random_split
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Subset
 
-# Split dataset into 80% train and 20% test
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+# Split dataset into 80% train and 20% test, STRATIFIED
+indices = list(range(len(dataset)))
+train_indices, test_indices = train_test_split(indices, test_size=0.2, stratify=dataset.labels, random_state=42)
 
-train_dataset = TransformedSubset(train_dataset, transform=train_transform)
-test_dataset = TransformedSubset(test_dataset, transform=test_transform)
+train_subset = Subset(dataset, train_indices)
+test_subset = Subset(dataset, test_indices)
 
-train_dataloader = DataLoader(
-    dataset=train_dataset,
-    batch_size=BATCH_SIZE,
-    shuffle=True
-)
+train_transform = transforms.Compose([
+    transforms.RandomResizedCrop(224, scale=(0.85, 1.0)),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomApply([transforms.ColorJitter(brightness=0.2, contrast=0.2)], p=0.5), # Removed hue/saturation to preserve skin tones
+    transforms.RandomRotation(15),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
 
-test_dataloader = DataLoader(
-    dataset=test_dataset,
-    batch_size=BATCH_SIZE,
-    shuffle=False
-)
+test_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+train_dataset = TransformedSubset(train_subset, transform=train_transform)
+test_dataset = TransformedSubset(test_subset, transform=test_transform)
 
 # ========================
 # Model Configuration
 # ========================
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 num_classes = 2  # Binary classification: cancer (1) vs no cancer (0)
-lr = 1e-4
-epochs = 10
+epochs = 80      
 
 model = timm.create_model(
     "efficientformer_l1",
     pretrained=True,
-    num_classes=num_classes
+    num_classes=num_classes,
+    drop_rate=0.4,       # Dropout
+    drop_path_rate=0.2    # Stochastic Depth
 )
 
 model.to(device)
@@ -123,13 +128,53 @@ model.to(device)
 # ========================
 # Training Setup
 # ========================
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
+import numpy as np
+from torch.utils.data import WeightedRandomSampler
+
+# Calculate class weights for WeightedRandomSampler
+train_labels = [dataset.labels[i] for i in train_dataset.subset.indices]
+train_labels_arr = np.array(train_labels)
+class_sample_count = np.array([len(np.where(train_labels_arr == t)[0]) for t in np.unique(train_labels_arr)])
+weight = 1. / class_sample_count
+samples_weight = np.array([weight[t] for t in train_labels])
+samples_weight = torch.from_numpy(samples_weight).double()
+
+sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+
+train_dataloader = DataLoader(
+    dataset=train_dataset,
+    batch_size=BATCH_SIZE,
+    sampler=sampler,
+    num_workers=4 if os.name != 'nt' else 0,
+    pin_memory=True
+)
+
+test_dataloader = DataLoader(
+    dataset=test_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=False,
+    num_workers=4 if os.name != 'nt' else 0,
+    pin_memory=True
+)
+
+# Label smoothing only. No class weights here because the sampler already balances the batches
+criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+
+# OneCycleLR requires max_lr
+optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.05)
+scheduler = optim.lr_scheduler.OneCycleLR(
+    optimizer,
+    max_lr=1e-4,
+    epochs=epochs,
+    steps_per_epoch=len(train_dataloader),
+    pct_start=0.1 # 10% of training spent warming up
+)
 
 # ========================
 # Training Loop
 # ========================
+best_test_acc = 0.0
+
 for epoch in range(epochs):
     # Training phase
     model.train()
@@ -144,7 +189,12 @@ for epoch in range(epochs):
         outputs = model(images)
         loss = criterion(outputs, labels)
         loss.backward()
+        
+        # Gradient clipping to prevent exploding gradients
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
         optimizer.step()
+        scheduler.step() # Step per batch for OneCycleLR
 
         train_loss += loss.item()
         
@@ -178,12 +228,17 @@ for epoch in range(epochs):
     test_accuracy = 100 * test_correct / test_total
     avg_test_loss = test_loss / len(test_dataloader)
 
-    scheduler.step()
+    # Save the best model
+    if test_accuracy > best_test_acc:
+        best_test_acc = test_accuracy
+        torch.save(model.state_dict(), "best_efficientformer_model.pth")
+        save_msg = " (Best Model Saved!)"
+    else:
+        save_msg = ""
 
     print(f"Epoch {epoch+1}/{epochs} | "
           f"Train Loss: {avg_train_loss:.4f}, Train Acc: {train_accuracy:.2f}% | "
-          f"Test Loss: {avg_test_loss:.4f}, Test Acc: {test_accuracy:.2f}%")
+          f"Test Loss: {avg_test_loss:.4f}, Test Acc: {test_accuracy:.2f}%{save_msg}")
 
-print("\nTraining completed!")
-torch.save(model.state_dict(), "efficientformer_model.pth")
-print("Model saved as 'efficientformer_model.pth'")
+print(f"\nTraining completed! Best Test Accuracy: {best_test_acc:.2f}%")
+torch.save(model.state_dict(), "last_efficientformer_model.pth")
