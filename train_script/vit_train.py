@@ -14,15 +14,15 @@ class SkinCancerDataset(Dataset):
         self.img_dirs = img_dirs if isinstance(img_dirs, list) else [img_dirs]
         self.transform = transform
 
-        # Map the 7 labels to binary (0 = no_cancer, 1 = cancer)
+        # Map the 7 labels to 7 individual classes (0 to 6)
         self.label_map = {
-            "mel": 1,   # Melanoma
+            "mel": 0,   # Melanoma
             "bcc": 1,   # Basal Cell Carcinoma
-            "akiec": 1, # Bowen’s / SCC in situ
-            "nv": 0,
-            "bkl": 0,
-            "df": 0,
-            "vasc": 0
+            "akiec": 2, # Bowen’s / SCC in situ
+            "nv": 3,
+            "bkl": 4,
+            "df": 5,
+            "vasc": 6
         }
         
         # Pre-calculate labels for weighted loss calculation later if needed
@@ -112,7 +112,7 @@ test_dataset = TransformedSubset(test_subset, transform=test_transform)
 # Model Configuration
 # ========================
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-num_classes = 2  # Binary classification: cancer (1) vs no cancer (0)
+num_classes = 7  # 7-class classification
 epochs = 80      
 
 model = timm.create_model(
@@ -171,16 +171,26 @@ scheduler = optim.lr_scheduler.OneCycleLR(
 )
 
 # ========================
+# Overfitting Detector Config
+# ========================
+OVERFIT_PATIENCE      = 5    # consecutive epochs the signal must hold before we exit
+OVERFIT_GAP_THRESHOLD = 15.0 # (%) train_acc - test_acc gap that flags overfitting
+OVERFIT_LOSS_MIN_DELTA = 0.01 # min delta for test loss to be considered "rising"
+
+overfit_streak = 0           # how many consecutive epochs overfitting signal fired
+
+# ========================
 # Training Loop
 # ========================
-best_test_acc = 0.0
+best_test_acc  = 0.0
+prev_test_loss = float("inf")
 
 for epoch in range(epochs):
-    # Training phase
+    # ── Training phase ─────────────────────────────────────────
     model.train()
-    train_loss = 0
+    train_loss    = 0
     train_correct = 0
-    train_total = 0
+    train_total   = 0
 
     for images, labels in train_dataloader:
         images, labels = images.to(device), labels.to(device)
@@ -189,56 +199,79 @@ for epoch in range(epochs):
         outputs = model(images)
         loss = criterion(outputs, labels)
         loss.backward()
-        
+
         # Gradient clipping to prevent exploding gradients
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        
-        optimizer.step()
-        scheduler.step() # Step per batch for OneCycleLR
 
-        train_loss += loss.item()
-        
-        # Calculate training accuracy
-        _, predicted = torch.max(outputs.data, 1)
-        train_total += labels.size(0)
+        optimizer.step()
+        scheduler.step()   # Step per batch for OneCycleLR
+
+        train_loss    += loss.item()
+        _, predicted   = torch.max(outputs.data, 1)
+        train_total   += labels.size(0)
         train_correct += (predicted == labels).sum().item()
 
     train_accuracy = 100 * train_correct / train_total
     avg_train_loss = train_loss / len(train_dataloader)
 
-    # Testing/Evaluation phase
+    # ── Evaluation phase ────────────────────────────────────────
     model.eval()
-    test_loss = 0
+    test_loss    = 0
     test_correct = 0
-    test_total = 0
+    test_total   = 0
 
     with torch.no_grad():
         for images, labels in test_dataloader:
             images, labels = images.to(device), labels.to(device)
-
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+            outputs  = model(images)
+            loss     = criterion(outputs, labels)
             test_loss += loss.item()
-
-            # Calculate test accuracy
             _, predicted = torch.max(outputs.data, 1)
-            test_total += labels.size(0)
+            test_total   += labels.size(0)
             test_correct += (predicted == labels).sum().item()
 
-    test_accuracy = 100 * test_correct / test_total
-    avg_test_loss = test_loss / len(test_dataloader)
+    test_accuracy  = 100 * test_correct / test_total
+    avg_test_loss  = test_loss / len(test_dataloader)
 
-    # Save the best model
+    # ── Save best model ─────────────────────────────────────────
     if test_accuracy > best_test_acc:
         best_test_acc = test_accuracy
         torch.save(model.state_dict(), "best_efficientformer_model.pth")
-        save_msg = " (Best Model Saved!)"
+        save_msg = " ✅ (Best Model Saved!)"
     else:
         save_msg = ""
 
+    # ── Overfitting detection ────────────────────────────────────
+    acc_gap        = train_accuracy - test_accuracy          # large gap = overfit
+    loss_diverging = avg_test_loss > prev_test_loss + OVERFIT_LOSS_MIN_DELTA  # test loss rising
+
+    overfit_signal = (acc_gap > OVERFIT_GAP_THRESHOLD) and loss_diverging
+
+    if overfit_signal:
+        overfit_streak += 1
+    else:
+        overfit_streak = 0   # reset if a single epoch looks healthy
+
+    prev_test_loss = avg_test_loss
+
     print(f"Epoch {epoch+1}/{epochs} | "
           f"Train Loss: {avg_train_loss:.4f}, Train Acc: {train_accuracy:.2f}% | "
-          f"Test Loss: {avg_test_loss:.4f}, Test Acc: {test_accuracy:.2f}%{save_msg}")
+          f"Test Loss: {avg_test_loss:.4f}, Test Acc: {test_accuracy:.2f}% | "
+          f"Gap: {acc_gap:.2f}%  Overfit streak: {overfit_streak}/{OVERFIT_PATIENCE}"
+          f"{save_msg}")
+
+    # ── Exit on confirmed overfitting ────────────────────────────
+    if overfit_streak >= OVERFIT_PATIENCE:
+        print("\n" + "=" * 60)
+        print("🚨 OVERFITTING DETECTED — stopping training early!")
+        print(f"   Train Acc  : {train_accuracy:.2f}%")
+        print(f"   Test  Acc  : {test_accuracy:.2f}%")
+        print(f"   Gap        : {acc_gap:.2f}%  (threshold: {OVERFIT_GAP_THRESHOLD}%)")
+        print(f"   Streak     : {overfit_streak} consecutive epochs")
+        print(f"   Best model saved at epoch where test acc = {best_test_acc:.2f}%")
+        print("=" * 60)
+        torch.save(model.state_dict(), "last_efficientformer_model.pth")
+        raise SystemExit(1)   # exit with error code so a calling script can detect it
 
 print(f"\nTraining completed! Best Test Accuracy: {best_test_acc:.2f}%")
 torch.save(model.state_dict(), "last_efficientformer_model.pth")

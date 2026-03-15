@@ -11,6 +11,7 @@ import torch
 from torch import nn
 from torchvision import transforms
 import torchvision
+import timm
 from PIL import Image
 from flask import Flask, render_template, request, jsonify
 
@@ -21,7 +22,7 @@ from flask import Flask, render_template, request, jsonify
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-MODEL_PATH = os.path.join(BASE_DIR, "model", "efficientformer_model.pth")
+MODEL_PATH = os.path.join(BASE_DIR, "model", "best_efficientformer_model.pth")
 
 # ─────────────────────────────────────────────
 # Flask app
@@ -45,12 +46,30 @@ print(f"[INFO] Using device: {device}")
 image_model = None
 
 
-def build_vit_model(num_classes: int = 2) -> nn.Module:
-    """Construct a ViT-B/16 with a custom classification head."""
-    vit = torchvision.models.vit_b_16(weights=None)          # no pre-trained weights; we load our own
-    in_features = vit.heads.head.in_features
-    vit.heads.head = nn.Linear(in_features, num_classes)
-    return vit
+# ── Class mapping must match vit_train.py exactly ────────────────────────
+# 0=mel, 1=bcc, 2=akiec, 3=nv, 4=bkl, 5=df, 6=vasc
+CLASS_NAMES = ["mel", "bcc", "akiec", "nv", "bkl", "df", "vasc"]
+
+# Malignant / high-risk classes (melanoma, basal cell carcinoma, squamous-cell in-situ)
+HIGH_RISK_CLASSES   = {0, 1, 2}   # mel, bcc, akiec
+# Moderately concerning classes
+MODERATE_RISK_CLASSES = {6}        # vasc (vascular lesions worth watching)
+# Benign classes
+LOW_RISK_CLASSES    = {3, 4, 5}   # nv (mole), bkl (seb. keratosis), df (dermatofibroma)
+
+NUM_CLASSES = 7
+
+
+def build_vit_model(num_classes: int = NUM_CLASSES) -> nn.Module:
+    """Construct an efficientformer_l1 matching the training script."""
+    model = timm.create_model(
+        "efficientformer_l1",
+        pretrained=False,
+        num_classes=num_classes,
+        drop_rate=0.4,
+        drop_path_rate=0.2
+    )
+    return model
 
 
 def load_image_model() -> bool:
@@ -65,7 +84,7 @@ def load_image_model() -> bool:
         return False
 
     try:
-        image_model = build_vit_model(num_classes=2)
+        image_model = build_vit_model(num_classes=NUM_CLASSES)
         state_dict = torch.load(MODEL_PATH, map_location=device)
         image_model.load_state_dict(state_dict)
         image_model.to(device)
@@ -108,7 +127,7 @@ def predict_skin_cancer():
     if not load_image_model():
         return jsonify({
             "success": False,
-            "error": "Model could not be loaded. Check that model/model.pth exists.",
+            "error": "Model could not be loaded. Check that model/best_efficientformer_model.pth exists.",
         }), 500
 
     if "image" not in request.files:
@@ -126,22 +145,30 @@ def predict_skin_cancer():
 
         # Inference
         with torch.no_grad():
-            logits = image_model(tensor)                         # (1, 2)
-            probs = torch.softmax(logits, dim=1)[0]              # (2,)
-            prediction = int(torch.argmax(probs).item())
-            cancer_prob = float(probs[1].item()) * 100           # class-1 = cancer
+            logits = image_model(tensor)                         # (1, 7)
+            probs = torch.softmax(logits, dim=1)[0]              # (7,)
+            predicted_class = int(torch.argmax(probs).item())    # 0-6
+            predicted_name  = CLASS_NAMES[predicted_class]
+
+        # Aggregate risk from all 7 class probabilities
+        high_risk_prob     = float(sum(probs[c].item() for c in HIGH_RISK_CLASSES))     * 100
+        moderate_risk_prob = float(sum(probs[c].item() for c in MODERATE_RISK_CLASSES)) * 100
+        low_risk_prob      = float(sum(probs[c].item() for c in LOW_RISK_CLASSES))      * 100
 
         # ── Debug logging ──────────────────────────────────────
         print("[PREDICT] ──────────────────────────────────────")
-        print(f"[PREDICT] File         : {file.filename}")
-        print(f"[PREDICT] Logits       : {logits[0].tolist()}")
-        print(f"[PREDICT] Probabilities: benign={probs[0].item()*100:.2f}%  cancer={probs[1].item()*100:.2f}%")
-        print(f"[PREDICT] Predicted cls: {prediction}  ({'cancer' if prediction == 1 else 'benign'})")
-        print(f"[PREDICT] Cancer prob  : {cancer_prob:.2f}%")
+        print(f"[PREDICT] File           : {file.filename}")
+        print(f"[PREDICT] Logits         : {logits[0].tolist()}")
+        for i, name in enumerate(CLASS_NAMES):
+            print(f"[PREDICT]   {name:6s}: {probs[i].item()*100:.2f}%")
+        print(f"[PREDICT] Predicted class: {predicted_class} ({predicted_name})")
+        print(f"[PREDICT] High-risk prob : {high_risk_prob:.2f}%")
+        print(f"[PREDICT] Moderate prob  : {moderate_risk_prob:.2f}%")
+        print(f"[PREDICT] Low-risk prob  : {low_risk_prob:.2f}%")
         print("[PREDICT] ──────────────────────────────────────")
 
-        # Build human-readable result
-        if cancer_prob > 70:
+        # Build human-readable result based on aggregated risk
+        if high_risk_prob > 50:
             diagnosis = "High Risk — Skin Cancer Suspected"
             description = (
                 "The analysis identifies features strongly associated with malignant skin "
@@ -149,7 +176,7 @@ def predict_skin_cancer():
                 "irregular borders, asymmetry, and colour variation. "
                 "<strong>Please consult a dermatologist immediately.</strong>"
             )
-        elif cancer_prob > 40:
+        elif high_risk_prob > 25 or moderate_risk_prob > 40:
             diagnosis = "Moderate Risk — Further Examination Needed"
             description = (
                 "The lesion shows some concerning characteristics. "
@@ -165,8 +192,9 @@ def predict_skin_cancer():
 
         return jsonify({
             "success": True,
-            "probability": round(cancer_prob, 2),
-            "prediction": prediction,
+            "probability": round(high_risk_prob, 2),
+            "prediction": predicted_class,
+            "predicted_condition": predicted_name,
             "diagnosis": diagnosis,
             "description": description,
         })
