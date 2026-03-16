@@ -18,10 +18,10 @@ from flask import Flask, render_template, request, jsonify
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-MODEL_PATH = os.path.join(BASE_DIR, "model", "random_forest_model.joblib")
+MODEL_PATH = os.path.join(BASE_DIR, "model", "catboost_model.joblib")
 
-# Fallback to catboost model if random forest not found
-CATBOOST_MODEL_PATH = os.path.join(BASE_DIR, "model", "catboost_model.joblib")
+# Fallback to random forest model if catboost not found
+RANDOM_FOREST_MODEL_PATH = os.path.join(BASE_DIR, "model", "random_forest_model.joblib")
 
 # ─────────────────────────────────────────────
 # Flask app
@@ -33,11 +33,11 @@ app = Flask(
 )
 
 # ─────────────────────────────────────────────
-# Model – Random Forest trained for blood
+# Model – CatBoost trained for blood
 # sample leukemia classification (0 = Negative, 1 = Positive)
 # ─────────────────────────────────────────────
 blood_model = None
-model_type = None  # 'random_forest' or 'catboost'
+model_type = None  # 'catboost' or 'random_forest'
 
 # Feature names must match training data
 FEATURE_NAMES = [
@@ -63,27 +63,27 @@ def load_blood_model() -> bool:
     if blood_model is not None:
         return True
 
-    # Try random forest model first
+    # Try catboost model first
     if os.path.exists(MODEL_PATH):
         try:
             blood_model = load(MODEL_PATH)
-            model_type = 'random_forest'
-            print(f"[INFO] ✅ Random Forest model loaded from {MODEL_PATH}")
-            return True
-        except Exception as exc:
-            print(f"[WARNING] Failed to load Random Forest model: {exc}")
-
-    # Fallback to catboost model
-    if os.path.exists(CATBOOST_MODEL_PATH):
-        try:
-            blood_model = load(CATBOOST_MODEL_PATH)
             model_type = 'catboost'
-            print(f"[INFO] ✅ CatBoost model loaded from {CATBOOST_MODEL_PATH}")
+            print(f"[INFO] ✅ CatBoost model loaded from {MODEL_PATH}")
             return True
         except Exception as exc:
-            print(f"[ERROR] Failed to load CatBoost model: {exc}")
+            print(f"[WARNING] Failed to load CatBoost model: {exc}")
+
+    # Fallback to random forest model
+    if os.path.exists(RANDOM_FOREST_MODEL_PATH):
+        try:
+            blood_model = load(RANDOM_FOREST_MODEL_PATH)
+            model_type = 'random_forest'
+            print(f"[INFO] ✅ Random Forest model loaded from {RANDOM_FOREST_MODEL_PATH}")
+            return True
+        except Exception as exc:
+            print(f"[ERROR] Failed to load Random Forest model: {exc}")
     
-    print(f"[ERROR] No model found at {MODEL_PATH} or {CATBOOST_MODEL_PATH}")
+    print(f"[ERROR] No model found at {MODEL_PATH} or {RANDOM_FOREST_MODEL_PATH}")
     return False
 
 
@@ -121,7 +121,7 @@ def predict_blood_sample():
     if not load_blood_model():
         return jsonify({
             "success": False,
-            "error": "Model could not be loaded. Check that model/random_forest_model.joblib or model/catboost_model.joblib exists.",
+            "error": "Model could not be loaded. Check that model/catboost_model.joblib or model/random_forest_model.joblib exists.",
         }), 500
 
     # Parse JSON request
