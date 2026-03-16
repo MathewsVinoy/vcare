@@ -27,37 +27,104 @@ def image_detection():
 
 @app.route('/predict_blood_sample', methods=['POST'])
 def predict_blood_sample():
+    """
+    Blood sample prediction endpoint with 16 features
+    
+    Expected JSON fields (in order):
+    - gender: int (0=Male, 1=Female)
+    - age: float (years)
+    - hb: float (Hemoglobin, g/dL)
+    - rbc: float (Red Blood Cells, M cells/µL)
+    - wbc: float (White Blood Cells, cells/µL)
+    - platelets: float (Platelet count, cells/µL)
+    - lymp: float (Lymphocytes, %)
+    - mono: float (Monocytes, %)
+    - hct: float (Hematocrit, %)
+    - mcv: float (Mean Corpuscular Volume, fL)
+    - mch: float (Mean Corpuscular Hemoglobin, pg)
+    - mchc: float (Mean Corpuscular Hemoglobin Concentration, g/dL)
+    - rdw: float (Red Distribution Width, %)
+    - pdw: float (Platelet Distribution Width, %)
+    - mpv: float (Mean Platelet Volume, fL)
+    - pct: float (Plateletcrit, %)
+    """
     try:
         data = request.json
         
-        # Extract features in the correct order (as per the trained model)
-        features = [
-            float(data['age']),
-            int(data['gender']),
-            float(data['wbc_count']),
-            float(data['rbc_count']),
-            float(data['platelet_count']),
-            float(data['hemoglobin_level']),
-            float(data['bone_marrow_blasts']),
-            int(data['family_history']),
-            int(data['smoking_status']),
-            int(data['radiation_exposure']),
-            float(data['bmi']),
-            int(data['infection_history'])
-        ]
+        if not data:
+            return jsonify({
+                'error': 'No JSON data provided',
+                'success': False
+            }), 400
         
-        # Convert to numpy array with shape (1, 12)
+        # Extract and validate 16 features in correct order
+        try:
+            features = [
+                int(data.get('gender', 0)),        # 0: Gender
+                float(data.get('age', 0)),          # 1: Age
+                float(data.get('hb', 0)),           # 2: Hemoglobin
+                float(data.get('rbc', 0)),          # 3: RBC
+                float(data.get('wbc', 0)),          # 4: WBC
+                float(data.get('platelets', 0)),    # 5: Platelets
+                float(data.get('lymp', 0)),         # 6: Lymphocytes
+                float(data.get('mono', 0)),         # 7: Monocytes
+                float(data.get('hct', 0)),          # 8: Hematocrit
+                float(data.get('mcv', 0)),          # 9: MCV
+                float(data.get('mch', 0)),          # 10: MCH
+                float(data.get('mchc', 0)),         # 11: MCHC
+                float(data.get('rdw', 0)),          # 12: RDW
+                float(data.get('pdw', 0)),          # 13: PDW
+                float(data.get('mpv', 0)),          # 14: MPV
+                float(data.get('pct', 0))           # 15: PCT
+            ]
+        except (TypeError, ValueError) as e:
+            return jsonify({
+                'error': f'Invalid data types in request: {str(e)}',
+                'success': False
+            }), 400
+        
+        # Validate ranges
+        validation_errors = []
+        if features[1] < 1 or features[1] > 120:
+            validation_errors.append('Age must be between 1 and 120 years')
+        if features[0] not in [0, 1]:
+            validation_errors.append('Gender must be 0 (Male) or 1 (Female)')
+        if features[2] < 0 or features[2] > 20:
+            validation_errors.append('Hemoglobin must be between 0 and 20 g/dL')
+        if features[4] < 0 or features[4] > 50000:
+            validation_errors.append('WBC must be between 0 and 50,000 cells/µL')
+        if features[5] < 0 or features[5] > 1000000:
+            validation_errors.append('Platelets must be between 0 and 1,000,000 cells/µL')
+        
+        if validation_errors:
+            return jsonify({
+                'error': 'Validation errors: ' + '; '.join(validation_errors),
+                'success': False
+            }), 400
+        
+        # Convert to numpy array with shape (1, 16)
         import numpy as np
         features_array = np.array([features])
+        
+        # Debug logging
+        print("[BLOOD_PREDICT] ─────────────────────────────────")
+        print(f"[BLOOD_PREDICT] Gender: {features[0]}, Age: {features[1]}")
+        print(f"[BLOOD_PREDICT] Hb: {features[2]}, RBC: {features[3]}, WBC: {features[4]}, Platelets: {features[5]}")
+        print(f"[BLOOD_PREDICT] Lymp: {features[6]}, Mono: {features[7]}, HCT: {features[8]}")
+        print(f"[BLOOD_PREDICT] MCV: {features[9]}, MCH: {features[10]}, MCHC: {features[11]}")
+        print(f"[BLOOD_PREDICT] RDW: {features[12]}, PDW: {features[13]}, MPV: {features[14]}, PCT: {features[15]}")
         
         # Make prediction using model module
         result = blood_model.predict(features_array)
         
         if not result.get('success', False):
             return jsonify({
-                'error': result.get('error', 'Model not loaded'),
+                'error': result.get('error', 'Prediction failed'),
                 'success': False
             }), 500
+        
+        print(f"[BLOOD_PREDICT] Prediction: {result.get('raw_prediction')}, Probability: {result.get('probability')}")
+        print("[BLOOD_PREDICT] ─────────────────────────────────")
         
         return jsonify(result)
             
@@ -72,6 +139,7 @@ def predict_blood_sample():
             'success': False
         }), 400
     except Exception as e:
+        print(f"[ERROR] Prediction failed: {e}")
         return jsonify({
             'error': f'Prediction error: {str(e)}',
             'success': False
