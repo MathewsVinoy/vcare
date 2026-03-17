@@ -1,94 +1,118 @@
 /* VCare AI — Advanced Blood Sample Analysis */
 
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('bloodSampleForm');
-    const predictBtn = document.getElementById('predictBtn');
-    const resultEl = document.getElementById('resultContainer');
-    const resetBtn = document.getElementById('resetBtn');
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("bloodSampleForm");
+  const predictBtn = document.getElementById("predictBtn");
+  const resultEl = document.getElementById("resultContainer");
+  const resetBtn = document.getElementById("resetBtn");
 
-    // Sidebar
-    const sidebar = document.getElementById('sidebar');
-    document.getElementById('sidebarToggle')?.addEventListener('click', () => {
-        sidebar.classList.toggle('collapsed');
-    });
-    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-        sidebar.classList.toggle('open');
-    });
+  // Sidebar
+  const sidebar = document.getElementById("sidebar");
+  document.getElementById("sidebarToggle")?.addEventListener("click", () => {
+    sidebar.classList.toggle("collapsed");
+  });
+  document.getElementById("mobileMenuBtn")?.addEventListener("click", () => {
+    sidebar.classList.toggle("open");
+  });
 
-    // Form submission
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        resultEl.style.display = 'none';
+  // Form submission
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-        // Extract 16 features in correct order: Gender, Age, Hb, RBC, WBC, PLATELETS, LYMP, MONO, HCT, MCV, MCH, MCHC, RDW, PDW, MPV, PCT
-        const data = {
-            gender: parseInt(form.gender.value),
-            age: parseFloat(form.age.value),
-            hb: parseFloat(form.hb.value),
-            rbc: parseFloat(form.rbc.value),
-            wbc: parseFloat(form.wbc.value),
-            platelets: parseFloat(form.platelets.value),
-            lymp: parseFloat(form.lymp.value),
-            mono: parseFloat(form.mono.value),
-            hct: parseFloat(form.hct.value),
-            mcv: parseFloat(form.mcv.value),
-            mch: parseFloat(form.mch.value),
-            mchc: parseFloat(form.mchc.value),
-            rdw: parseFloat(form.rdw.value),
-            pdw: parseFloat(form.pdw.value),
-            mpv: parseFloat(form.mpv.value),
-            pct: parseFloat(form.pct.value)
-        };
+    // Ensure form values are captured
+    const formData = new FormData(form);
 
-        try {
-            const res = await fetch('/predict_blood_sample', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-
-            const result = await res.json();
-            
-            if (!res.ok || !result.success) {
-                throw new Error(result.error || 'Prediction failed');
-            }
-            
-            showResult(result);
-
-        } catch (err) {
-            console.error('Prediction error:', err);
-            showError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    });
-
-    // Reset button
-    resetBtn.addEventListener('click', () => {
-        resultEl.style.display = 'none';
-    });
-
-    function setLoading(on) {
-        predictBtn.disabled = on;
-        if (on) {
-            predictBtn.classList.add('loading');
-            predictBtn.innerHTML = '<i class="fas fa-spinner"></i><span>Analyzing…</span><span class="btn-subtext">Processing data</span>';
-        } else {
-            predictBtn.classList.remove('loading');
-            predictBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i><span>Run Advanced Analysis</span><span class="btn-subtext">AI-Powered Prediction</span>';
-        }
+    // Validate all fields are filled
+    for (let [key, value] of formData.entries()) {
+      if (!value) {
+        showError(`Please fill in all fields. Missing: ${key}`);
+        return false;
+      }
     }
 
-    function showResult(data) {
-        const isPositive = data.raw_prediction === 1;
-        const prob = data.probability !== null ? (data.probability * 100).toFixed(1) : null;
-        const confidence = prob !== null ? `${prob}%` : 'N/A';
-        const riskClass = isPositive ? 'high' : 'low';
-        const riskIcon = isPositive ? 'fa-circle-exclamation' : 'fa-circle-check';
-        const timestamp = new Date().toLocaleString();
+    setLoading(true);
+    resultEl.style.display = "none";
 
-        let resultHTML = `
+    // Extract 16 features in correct order: Gender, Age, Hb, RBC, WBC, PLATELETS, LYMP, MONO, HCT, MCV, MCH, MCHC, RDW, PDW, MPV, PCT
+    const data = {
+      gender: parseInt(form.gender.value || 0),
+      age: parseFloat(form.age.value || 0),
+      hb: parseFloat(form.hb.value || 0),
+      rbc: parseFloat(form.rbc.value || 0),
+      wbc: parseFloat(form.wbc.value || 0),
+      platelets: parseFloat(form.platelets.value || 0),
+      lymp: parseFloat(form.lymp.value || 0),
+      mono: parseFloat(form.mono.value || 0),
+      hct: parseFloat(form.hct.value || 0),
+      mcv: parseFloat(form.mcv.value || 0),
+      mch: parseFloat(form.mch.value || 0),
+      mchc: parseFloat(form.mchc.value || 0),
+      rdw: parseFloat(form.rdw.value || 0),
+      pdw: parseFloat(form.pdw.value || 0),
+      mpv: parseFloat(form.mpv.value || 0),
+      pct: parseFloat(form.pct.value || 0),
+    };
+
+    console.log("Sending data to server:", data);
+
+    try {
+      const res = await fetch("/predict_blood_sample", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      console.log("Server response:", result);
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Prediction failed");
+      }
+
+      showResult(result);
+    } catch (err) {
+      console.error("Prediction error:", err);
+      showError(err.message);
+    } finally {
+      setLoading(false);
+    }
+
+    return false;
+  });
+
+  // Reset button
+  resetBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    form.reset();
+    resultEl.style.display = "none";
+    resultEl.innerHTML = "";
+  });
+
+  function setLoading(on) {
+    predictBtn.disabled = on;
+    if (on) {
+      predictBtn.classList.add("loading");
+      predictBtn.innerHTML =
+        '<i class="fas fa-spinner"></i><span>Analyzing…</span>';
+    } else {
+      predictBtn.classList.remove("loading");
+      predictBtn.innerHTML =
+        '<i class="fas fa-wand-magic-sparkles"></i><span>Run Analysis</span>';
+    }
+  }
+
+  function showResult(data) {
+    const isPositive = data.raw_prediction === 1;
+    const prob =
+      data.probability !== null ? (data.probability * 100).toFixed(1) : null;
+    const confidence = prob !== null ? `${prob}%` : "N/A";
+    const riskClass = isPositive ? "high" : "low";
+    const riskIcon = isPositive ? "fa-circle-exclamation" : "fa-circle-check";
+    const timestamp = new Date().toLocaleString();
+
+    let resultHTML = `
             <div class="result-panel-title">
                 <i class="fas fa-chart-bar"></i>
                 Advanced Analysis Result
@@ -102,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="result-details">
                 <div class="detail-item">
                     <span class="detail-label">Analysis Type:</span>
-                    <span class="detail-value">CatBoost Classification Model</span>
+                    <span class="detail-value">${data.model_type || "CatBoost Classification Model"}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Timestamp:</span>
@@ -110,11 +134,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Raw Prediction:</span>
-                    <span class="detail-value">${isPositive ? 'Positive (1)' : 'Negative (0)'}</span>
+                    <span class="detail-value">${isPositive ? "Positive (1)" : "Negative (0)"}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Confidence:</span>
+                    <span class="detail-value">${data.confidence || confidence}</span>
                 </div>
             </div>
 
-            ${prob !== null ? `
+            ${
+              prob !== null
+                ? `
             <div class="prob-bar-wrapper">
                 <div class="prob-bar-label">
                     <span>Confidence Score</span>
@@ -124,12 +154,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="prob-bar-fill" id="probFill" style="width: 0%"></div>
                 </div>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
 
             <div class="result-description">
-                ${isPositive
-                ? '<strong>High Risk Indicators Detected:</strong> The analysis identified elevated bone marrow blasts, abnormal blood cell counts, or other concerning markers. <strong>Immediate medical consultation is recommended.</strong>'
-                : '<strong>Normal Risk Profile:</strong> Blood parameters are within normal ranges. No strong indicators of leukemia were detected based on the provided test data.'}
+                ${
+                  isPositive
+                    ? "<strong>High Risk Indicators Detected:</strong> The analysis identified elevated bone marrow blasts, abnormal blood cell counts, or other concerning markers. <strong>Immediate medical consultation is recommended.</strong>"
+                    : "<strong>Normal Risk Profile:</strong> Blood parameters are within normal ranges. No strong indicators of leukemia were detected based on the provided test data."
+                }
             </div>
 
             <div class="result-actions">
@@ -147,22 +181,22 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        resultEl.innerHTML = resultHTML;
-        resultEl.style.display = 'block';
+    resultEl.innerHTML = resultHTML;
+    resultEl.style.display = "block";
 
-        // Animate confidence bar
-        if (prob !== null) {
-            setTimeout(() => {
-                const fill = document.getElementById('probFill');
-                if (fill) fill.style.width = confidence;
-            }, 100);
-        }
-
-        resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Animate confidence bar
+    if (prob !== null) {
+      setTimeout(() => {
+        const fill = document.getElementById("probFill");
+        if (fill) fill.style.width = confidence;
+      }, 100);
     }
 
-    function showError(msg) {
-        resultEl.innerHTML = `
+    resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function showError(msg) {
+    resultEl.innerHTML = `
             <div class="result-panel-title">
                 <i class="fas fa-exclamation-circle" style="color: #dc2626"></i>
                 Analysis Error
@@ -174,13 +208,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 Please check your input values and try again. If the problem persists, contact support.
             </p>
         `;
-        resultEl.style.display = 'block';
-        resultEl.scrollIntoView({ behavior: 'smooth' });
-    }
+    resultEl.style.display = "block";
+    resultEl.scrollIntoView({ behavior: "smooth" });
+  }
 
-    // Download report function
-    window.downloadReport = function(data) {
-        const reportContent = `
+  // Download report function
+  window.downloadReport = function (data) {
+    const reportContent = `
 Blood Sample Analysis Report
 ============================
 Generated: ${new Date().toLocaleString()}
@@ -192,83 +226,15 @@ DISCLAIMER:
 This report is for informational purposes only and should not be used for clinical diagnosis.
 Consult a licensed healthcare professional for medical advice.
         `;
-        
-        const blob = new Blob([reportContent], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `blood-analysis-${Date.now()}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    };
-});
 
-        const prob = data.probability !== null ? (data.probability * 100).toFixed(1) : null;
-        const confidence = prob !== null ? `${prob}%` : 'N/A';
-        const riskClass = isPositive ? 'high' : 'low';
-        const riskIcon = isPositive ? 'fa-circle-exclamation' : 'fa-circle-check';
-
-        resultEl.innerHTML = `
-            <div class="result-panel-title">
-                <i class="fas fa-chart-bar"></i>
-                Prediction Result
-            </div>
-
-            <div class="risk-badge ${riskClass}">
-                <i class="fas ${riskIcon}"></i>
-                ${data.prediction}
-            </div>
-
-            ${prob !== null ? `
-            <div class="prob-bar-wrapper">
-                <div class="prob-bar-label">
-                    <span>Confidence Score</span>
-                    <span>${confidence}</span>
-                </div>
-                <div class="prob-bar-track">
-                    <div class="prob-bar-fill" id="probFill" style="width: 0%"></div>
-                </div>
-            </div>
-            ` : ''}
-
-            <div class="result-description">
-                ${isPositive
-                ? 'The model detected indicators consistent with <strong>leukemia risk</strong>. Elevated bone marrow blast percentages, abnormal blood cell counts, or combination of risk factors may have contributed to this prediction.'
-                : 'The blood sample parameters fall within <strong>normal or low-risk ranges</strong>. No strong indicators of leukemia were detected based on the provided data.'}
-            </div>
-
-            <div class="result-disclaimer">
-                <i class="fas fa-triangle-exclamation"></i>
-                This prediction is generated by an AI model and is intended for <strong>informational purposes only</strong>. Please consult a licensed hematologist or oncologist for clinical diagnosis and treatment.
-            </div>
-        `;
-
-        resultEl.style.display = 'block';
-
-        // Animate confidence bar
-        if (prob !== null) {
-            setTimeout(() => {
-                const fill = document.getElementById('probFill');
-                if (fill) fill.style.width = confidence;
-            }, 80);
-        }
-
-        resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    function showError(msg) {
-        resultEl.innerHTML = `
-            <div class="result-panel-title">
-                <i class="fas fa-xmark-circle" style="color: var(--red-400)"></i>
-                Error
-            </div>
-            <div class="result-description" style="border-left-color: var(--red-600);">
-                ${msg}
-            </div>
-        `;
-        resultEl.style.display = 'block';
-        resultEl.scrollIntoView({ behavior: 'smooth' });
-    }
+    const blob = new Blob([reportContent], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `blood-analysis-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
 });

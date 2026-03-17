@@ -1,159 +1,115 @@
-/* Blood Sample Analysis — Premium Modern Design */
+/* Blood Sample Analysis — Light Pink Theme (matching style.css) */
 
-/* ═══════════════════════════════════════════════════ */
-/* Premium Page Styling */
-/* ═══════════════════════════════════════════════════ */
-
-body.blood-analysis-page {
-  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
-  min-height: 100vh;
-}
-
-.premium-header {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  border-radius: 16px;
-  padding: 40px !important;
-  margin-bottom: 32px;
-  box-shadow: 0 20px 40px rgba(37, 99, 235, 0.15);
-  color: white;
-}
-
-.premium-header .page-header-icon {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 16px;
-  font-size: 32px;
-  margin-bottom: 16px;
-  width: fit-content;
-}
-
-.gradient-icon {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.3),
-    rgba(255, 255, 255, 0.1)
-  ) !important;
-  backdrop-filter: blur(10px);
-}
-
-.premium-header .page-title {
-  font-size: 32px;
-  font-weight: 700;
-  margin: 12px 0 8px 0;
-  letter-spacing: -0.5px;
-}
-
-.premium-header .page-subtitle {
-  font-size: 16px;
-  opacity: 0.95;
-  margin-bottom: 20px;
-  font-weight: 400;
-}
-
-.header-stats {
-  display: flex;
-  gap: 24px;
-  margin-top: 24px;
-  flex-wrap: wrap;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.15);
-  padding: 8px 16px;
-  border-radius: 8px;
-  backdrop-filter: blur(10px);
-}
-
-.stat-item i {
-  font-size: 16px;
-}
-
-/* ═══════════════════════════════════════════════════ */
-/* Premium Form Styling */
-/* ═══════════════════════════════════════════════════ */
-
-.premium-form {
+/* Form Layout */
+.analysis-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
-.premium-card {
-  background: white;
-  border-radius: 12px;
-  padding: 32px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+/* Form Cards */
+.form-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-card);
+  border-radius: var(--r-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  animation: cardIn 0.4s var(--ease) both;
+  transition: all 0.3s var(--ease);
 }
 
-.premium-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: rgba(37, 99, 235, 0.1);
+.form-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-focus);
 }
 
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.form-card:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.form-card:nth-child(3) {
+  animation-delay: 0.19s;
+}
+
+/* Form Card Headers */
 .form-card-header {
   display: flex;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   padding-bottom: 16px;
-  border-bottom: 2px solid #f0f4f8;
+  border-bottom: 1.5px solid var(--border-card);
 }
 
 .form-card-icon {
   width: 48px;
   height: 48px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
   flex-shrink: 0;
-}
-
-.demographic-icon {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  color: white;
-}
-
-.blood-icon {
-  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
-  color: white;
-}
-
-.history-icon {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: linear-gradient(135deg, var(--red-main), var(--red-mid));
   color: white;
 }
 
 .form-card-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-100);
   margin: 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.2px;
 }
 
 .form-card-subtitle {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-400);
   margin: 4px 0 0 0;
   font-weight: 400;
 }
 
-/* ═══════════════════════════════════════════════════ */
-/* Input Group Enhanced */
-/* ═══════════════════════════════════════════════════ */
+/* Form Groups */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .input-group-enhanced {
   position: relative;
 }
 
+.form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-200);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.label-unit {
+  font-size: 12px;
+  color: var(--text-400);
+  font-weight: 400;
+}
+
+/* Input Wrapper */
 .input-wrapper {
   position: relative;
   display: flex;
@@ -162,35 +118,76 @@ body.blood-analysis-page {
 
 .input-wrapper input,
 .input-wrapper select {
+  width: 100%;
+  padding: 10px 12px 10px 12px;
+  border: 1.5px solid var(--border-card);
+  border-radius: var(--r-md);
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  color: var(--text-100);
+  background: var(--bg-page);
+  transition:
+    border-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    background 0.2s var(--ease);
+  cursor: text;
+}
+
+.input-wrapper input::placeholder {
+  color: var(--text-500);
+}
+
+.input-wrapper input:hover,
+.input-wrapper select:hover {
+  border-color: var(--border-focus);
+  background: var(--bg-card);
+}
+
+.input-wrapper input:focus,
+.input-wrapper select:focus {
+  outline: none;
+  border-color: var(--red-main);
+  box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.1);
+  background: white;
+}
+
+.input-wrapper select {
   padding-right: 36px;
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23d32f2f' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
 }
 
 .input-icon {
   position: absolute;
   right: 12px;
-  color: #9ca3af;
+  color: var(--text-400);
   font-size: 14px;
   pointer-events: none;
+}
+
+.input-wrapper input:focus ~ .input-icon {
+  color: var(--red-main);
 }
 
 .helper-text {
   display: block;
   font-size: 12px;
-  color: #9ca3af;
-  margin-top: 6px;
+  color: var(--text-400);
+  margin-top: 2px;
   font-weight: 400;
 }
 
-/* ═══════════════════════════════════════════════════ */
-/* Form Grid Layouts */
-/* ═══════════════════════════════════════════════════ */
-
+/* Form Grids */
 .form-grid {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
-.grid-3 {
+.grid-2 {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
@@ -198,142 +195,95 @@ body.blood-analysis-page {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
-.grid-2 {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
 @media (max-width: 768px) {
-  .form-grid {
-    gap: 16px;
-  }
-
-  .grid-3,
+  .grid-2,
   .grid-4 {
     grid-template-columns: 1fr;
   }
 }
 
-/* ═══════════════════════════════════════════════════ */
-/* Premium Form Actions */
-/* ═══════════════════════════════════════════════════ */
-
-.premium-actions {
+/* Form Actions */
+.form-actions {
   display: flex;
-  gap: 16px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 2px solid #f0f4f8;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1.5px solid var(--border-card);
   flex-wrap: wrap;
 }
 
-.btn-lg {
-  padding: 14px 32px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: 10px;
+.btn-primary,
+.btn-secondary {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  transition: all 0.3s ease;
+  gap: 8px;
+  padding: 11px 24px;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--r-md);
   cursor: pointer;
   border: none;
-}
-
-.btn-lg i {
-  font-size: 18px;
-}
-
-.btn-subtext {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  opacity: 0.8;
-  margin-top: 2px;
+  transition: all 0.2s var(--ease);
+  white-space: nowrap;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  background: linear-gradient(135deg, var(--red-main), var(--red-mid));
   color: white;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(37, 99, 235, 0.3);
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--red-deep), var(--red-main));
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
-.btn-primary:active:not(:disabled) {
+.btn-primary:active {
   transform: translateY(0);
 }
 
-.btn-primary.loading {
-  opacity: 0.8;
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-primary.loading i {
-  animation: spin360 0.8s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
-  border: 2px solid #e5e7eb;
+  background: var(--bg-pink);
+  color: var(--red-main);
+  border: 1.5px solid rgba(211, 47, 47, 0.3);
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background: #e5e7eb;
-  border-color: #d1d5db;
+.btn-secondary:hover {
+  background: var(--bg-pink2);
+  border-color: rgba(211, 47, 47, 0.5);
 }
 
-/* ═══════════════════════════════════════════════════ */
-/* Animations */
-/* ═══════════════════════════════════════════════════ */
+.btn-secondary:active {
+  transform: scale(0.98);
+}
 
-@keyframes spin360 {
+@keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-@keyframes cardIn {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.premium-card {
-  animation: cardIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-}
-
-.premium-card:nth-child(1) {
-  animation-delay: 0.05s;
-}
-
-.premium-card:nth-child(2) {
-  animation-delay: 0.12s;
-}
-
-.premium-card:nth-child(3) {
-  animation-delay: 0.19s;
-}
-
-/* ═══════════════════════════════════════════════════ */
-/* Result Panel Enhancements */
-/* ═══════════════════════════════════════════════════ */
-
+/* Result Panel */
 .result-panel {
-  background: white;
-  border-radius: 12px;
-  padding: 32px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  margin-top: 32px;
-  animation: slideUp 0.4s ease;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-card);
+  border-radius: var(--r-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+  margin-top: 24px;
+  animation: slideUp 0.4s var(--ease) both;
 }
 
 @keyframes slideUp {
@@ -347,88 +297,102 @@ body.blood-analysis-page {
   }
 }
 
+.result-panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-100);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid var(--border-card);
+}
+
+.result-panel-title i {
+  font-size: 18px;
+  color: var(--red-main);
+}
+
+/* Risk Badge */
 .risk-badge {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  padding: 16px 20px;
-  border-radius: 10px;
-  margin: 20px 0;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  margin: 16px 0;
+  border-left: 4px solid;
 }
 
 .risk-badge.high {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  color: #991b1b;
-  border-left: 4px solid #dc2626;
+  background: linear-gradient(
+    135deg,
+    rgba(220, 38, 38, 0.1),
+    rgba(239, 68, 68, 0.08)
+  );
+  color: var(--red-darker);
+  border-left-color: var(--red-main);
 }
 
 .risk-badge.low {
-  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-  color: #166534;
-  border-left: 4px solid #16a34a;
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.1),
+    rgba(74, 222, 128, 0.08)
+  );
+  color: #15803d;
+  border-left-color: #22c55e;
 }
 
+.risk-badge.medium {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.1),
+    rgba(251, 191, 36, 0.08)
+  );
+  color: #92400e;
+  border-left-color: #f59e0b;
+}
+
+/* Probability Bar */
 .prob-bar-wrapper {
-  margin: 24px 0;
+  margin: 16px 0;
 }
 
 .prob-bar-label {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: #374151;
-  margin-bottom: 8px;
+  color: var(--text-200);
+  margin-bottom: 6px;
 }
 
 .prob-bar-track {
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
+  height: 6px;
+  background: var(--bg-pink);
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .prob-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #2563eb, #1e40af);
-  border-radius: 4px;
-  transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  background: linear-gradient(90deg, var(--red-main), var(--red-light));
+  border-radius: 3px;
+  transition: width 0.6s var(--ease);
 }
 
-/* ═══════════════════════════════════════════════════ */
-/* Result Panel Title */
-/* ═══════════════════════════════════════════════════ */
-
-.result-panel-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f0f4f8;
-}
-
-.result-panel-title i {
-  font-size: 20px;
-  color: #2563eb;
-}
-
-/* ═══════════════════════════════════════════════════ */
 /* Result Details */
-/* ═══════════════════════════════════════════════════ */
-
 .result-details {
-  background: #f9fafb;
-  border-radius: 8px;
+  background: var(--bg-pink);
+  border-radius: var(--r-md);
   padding: 16px;
   margin: 16px 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -440,63 +404,49 @@ body.blood-analysis-page {
 }
 
 .detail-label {
-  color: #6b7280;
+  color: var(--text-400);
   font-weight: 500;
 }
 
 .detail-value {
-  color: #1f2937;
+  color: var(--text-100);
   font-weight: 600;
 }
 
-.confidence-badge {
-  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-  color: #1e40af;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-weight: 600;
+/* Description & Disclaimer */
+.result-description,
+.result-disclaimer {
+  border-left: 4px solid;
+  padding: 14px 16px;
+  border-radius: 6px;
   font-size: 13px;
+  line-height: 1.6;
+  margin: 12px 0;
 }
-
-/* ═══════════════════════════════════════════════════ */
-/* Result Description & Disclaimer */
-/* ═══════════════════════════════════════════════════ */
 
 .result-description {
-  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-  border-left: 4px solid #0ea5e9;
-  padding: 16px;
-  border-radius: 6px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #164e63;
-  margin: 16px 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 205, 210, 0.3),
+    rgba(255, 193, 203, 0.2)
+  );
+  border-left-color: var(--red-main);
+  color: var(--text-200);
 }
 
 .result-description strong {
-  color: #0c4a6e;
+  color: var(--text-100);
   font-weight: 600;
 }
 
-.error-description {
-  background: linear-gradient(135deg, #fef2f2, #fee2e2) !important;
-  border-left-color: #dc2626 !important;
-  color: #991b1b !important;
-}
-
-.error-description strong {
-  color: #7f1d1d !important;
-}
-
 .result-disclaimer {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border-left: 4px solid #f59e0b;
-  padding: 14px;
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #78350f;
-  margin-top: 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 235, 238, 0.5),
+    rgba(255, 205, 210, 0.3)
+  );
+  border-left-color: var(--red-light);
+  color: var(--text-300);
   display: flex;
   gap: 10px;
 }
@@ -504,87 +454,79 @@ body.blood-analysis-page {
 .result-disclaimer i {
   flex-shrink: 0;
   font-size: 14px;
-  margin-top: 2px;
+  margin-top: 1px;
+  color: var(--red-main);
 }
 
 .result-disclaimer strong {
-  color: #451a03;
+  color: var(--text-100);
   font-weight: 600;
 }
 
-/* ═══════════════════════════════════════════════════ */
 /* Result Actions */
-/* ═══════════════════════════════════════════════════ */
-
 .result-actions {
   display: flex;
-  gap: 12px;
-  margin: 20px 0;
+  gap: 10px;
+  margin: 16px 0;
   flex-wrap: wrap;
 }
 
 .btn-action {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 13px;
+  gap: 6px;
+  padding: 9px 14px;
+  font-size: 12px;
   font-weight: 500;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: white;
-  color: #374151;
+  border: 1.5px solid var(--border-card);
+  border-radius: var(--r-md);
+  background: var(--bg-pink3);
+  color: var(--red-main);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease);
 }
 
 .btn-action:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
+  background: var(--bg-pink2);
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-action:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .btn-action i {
-  font-size: 14px;
+  font-size: 13px;
 }
 
-/* ═══════════════════════════════════════════════════ */
 /* Responsive Design */
-/* ═══════════════════════════════════════════════════ */
-
-@media (max-width: 640px) {
-  .premium-header {
-    padding: 24px !important;
-  }
-
-  .premium-header .page-title {
-    font-size: 24px;
-  }
-
-  .header-stats {
-    flex-direction: column;
-  }
-
-  .stat-item {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .premium-card {
-    padding: 20px;
+@media (max-width: 768px) {
+  .form-card {
+    padding: 16px;
   }
 
   .form-card-header {
-    flex-direction: column;
     gap: 12px;
   }
 
-  .btn-lg {
+  .form-card-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .form-card-title {
+    font-size: 15px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-secondary {
     width: 100%;
-    justify-content: center;
   }
 
   .result-details {
@@ -599,37 +541,18 @@ body.blood-analysis-page {
     width: 100%;
     justify-content: center;
   }
-
-  .risk-badge {
-    font-size: 16px;
-  }
 }
 
-/* ═══════════════════════════════════════════════════ */
-/* Print Styles */
-/* ═══════════════════════════════════════════════════ */
-
 @media print {
-  .btn-lg,
-  .btn-action,
-  .sidebar,
-  .topbar {
+  .form-actions,
+  .result-actions,
+  .btn-action {
     display: none;
   }
 
-  .page-content {
-    padding: 0;
-  }
-
-  .premium-header {
-    background: white;
-    color: black;
-    border: 1px solid #e5e7eb;
+  .form-card,
+  .result-panel {
     box-shadow: none;
-  }
-
-  .stat-item {
-    background: white;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-card);
   }
 }
