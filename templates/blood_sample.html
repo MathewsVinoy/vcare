@@ -28,7 +28,7 @@
     />
   </head>
 
-  <body class="blood-analysis-page">
+  <body>
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
@@ -69,7 +69,7 @@
       <div class="sidebar-footer">
         <div class="model-badge">
           <i class="fas fa-microchip"></i>
-          <span>Random Forest Model</span>
+          <span>CatBoost Model</span>
         </div>
       </div>
     </aside>
@@ -88,59 +88,30 @@
       </header>
 
       <main class="page-content">
-        <div class="page-header premium-header">
-          <div class="page-header-icon gradient-icon">
+        <div class="page-header">
+          <div class="page-header-icon">
             <i class="fas fa-flask-vial"></i>
           </div>
-          <div class="header-content">
-            <h1 class="page-title">Advanced Blood Analysis</h1>
+          <div>
+            <h1 class="page-title">Blood Analysis</h1>
             <p class="page-subtitle">
-              Powered by CatBoost AI — Real-time disease risk assessment with
-              clinical-grade accuracy
+              Enter complete blood count parameters for AI-powered disease risk
+              assessment
             </p>
-            <div class="header-stats">
-              <div class="stat-item">
-                <i class="fas fa-check-circle"></i>
-                <span>99.2% Accuracy</span>
-              </div>
-              <div class="stat-item">
-                <i class="fas fa-zap"></i>
-                <span>Instant Results</span>
-              </div>
-              <div class="stat-item">
-                <i class="fas fa-shield-alt"></i>
-                <span>HIPAA Compliant</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        <form id="bloodSampleForm" class="analysis-form premium-form">
-          <!-- Patient Demographics -->
-          <div class="form-card premium-card">
-            <div class="form-card-header">
-              <div class="form-card-icon demographic-icon">
-                <i class="fas fa-user-circle"></i>
-              </div>
-              <div>
-                <h1 class="form-card-title">Blood Test Results Input Form</h1>
-                <p class="form-card-subtitle">
-                  Enter 16 complete blood count parameters
-                </p>
-              </div>
-            </div>
-          </div>
-
+        <form id="bloodSampleForm" class="analysis-form">
           <!-- Blood Test Parameters -->
-          <div class="form-card premium-card">
+          <div class="form-card">
             <div class="form-card-header">
-              <div class="form-card-icon blood-icon">
+              <div class="form-card-icon">
                 <i class="fas fa-droplet"></i>
               </div>
               <div>
                 <h2 class="form-card-title">Complete Blood Count</h2>
                 <p class="form-card-subtitle">
-                  Blood test parameters and measurements
+                  Enter 16 blood test parameters and measurements
                 </p>
               </div>
             </div>
@@ -414,11 +385,11 @@
             </div>
           </div>
 
-          <!-- Medical History -->
-          <div class="form-card premium-card">
+          <!-- Patient Demographics -->
+          <div class="form-card">
             <div class="form-card-header">
-              <div class="form-card-icon history-icon">
-                <i class="fas fa-clipboard-list"></i>
+              <div class="form-card-icon">
+                <i class="fas fa-user-circle"></i>
               </div>
               <div>
                 <h2 class="form-card-title">Patient Information</h2>
@@ -460,13 +431,17 @@
             </div>
           </div>
 
-          <div class="form-actions premium-actions">
-            <button type="submit" class="btn-primary btn-lg" id="predictBtn">
+          <div class="form-actions">
+            <button
+              type="submit"
+              class="btn-primary"
+              id="predictBtn"
+              onclick="return false;"
+            >
               <i class="fas fa-wand-magic-sparkles"></i>
-              <span>Run Advanced Analysis</span>
-              <span class="btn-subtext">AI-Powered Prediction</span>
+              <span>Run Analysis</span>
             </button>
-            <button type="reset" class="btn-secondary btn-lg" id="resetBtn">
+            <button type="button" class="btn-secondary" id="resetBtn">
               <i class="fas fa-history"></i>
               <span>Reset Form</span>
             </button>
