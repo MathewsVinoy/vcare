@@ -1,4 +1,4 @@
-"""Phi-3 Chat Model Module"""
+"""Phi-3 Chat Model Module with External LLM Support"""
 
 import torch
 from transformers import (
@@ -18,6 +18,7 @@ from threading import Lock
 from threading import Thread
 
 import psutil
+from .external_llm_client import ExternalLLMClient
 
 
 class ChatModel:
@@ -29,12 +30,28 @@ class ChatModel:
         router_model_name="google/flan-t5-small",
         cache_dir=None,
         offload_dir=None,
+        external_llm_url=None,
     ):
         self.model_name = model_name
         self.router_model_name = router_model_name
         self.cache_dir = os.path.abspath(cache_dir or os.path.join(os.path.dirname(__file__), "../model_cache"))
         self.offload_dir = os.path.abspath(offload_dir or os.path.join(os.path.dirname(__file__), "../offload_dir"))
         self.router_cache_dir = self.cache_dir
+
+        # Initialize external LLM client (REQUIRED for chat)
+        self.external_llm = ExternalLLMClient(external_llm_url)
+        self.use_external_llm = external_llm_url is not None
+        self.external_llm_url = external_llm_url
+        
+        # Chat requires external LLM - check if configured
+        if not external_llm_url:
+            print("\n" + "="*60)
+            print("⚠️  WARNING: Chat requires Colab LLM configuration")
+            print("="*60)
+            print("\nTo enable chat, set EXTERNAL_LLM_URL:")
+            print("  export EXTERNAL_LLM_URL='https://xxxxx.ngrok.io'")
+            print("\nThen restart this app.")
+            print("="*60 + "\n")
 
         self.model = None
         self.tokenizer = None
@@ -519,78 +536,144 @@ class ChatModel:
             return False
     
     def chat(self, prompt):
-        """Generate a chat response or greeting choices"""
-        prepared = self._prepare_prompt(prompt)
-        if prepared["mode"] == "final":
-            return prepared["result"]
+        """Generate a chat response using Colab LLM (required)\n        Chat REQUIRES external LLM from Colab - no fallback to local model.
+        """
+        # Chat REQUIRES external LLM from Colab - no fallback to local
+        if not self.external_llm_url:
+            return {
+                'is_greeting': False,
+                'response': 'Chat is unavailable. Please configure EXTERNAL_LLM_URL to connect to Colab LLM server.\n\nSet: export EXTERNAL_LLM_URL="https://xxxxx.ngrok.io"',
+                'status': 'error'
+            }
+        
+        if not self.use_external_llm:
+            return {
+                'is_greeting': False,
+                'response': 'Chat is unavailable. Cannot connect to Colab LLM server at ' + self.external_llm_url + '. Ensure the Colab notebook is running.',
+                'status': 'error'
+            }
+        
+        # Use external LLM only
+        return self._chat_external(prompt)
 
-        messages = prepared["messages"]
-        inference_context = torch.inference_mode if hasattr(torch, "inference_mode") else nullcontext
-        with self.generation_lock:
-            with inference_context():
-                output = self.pipe(messages, **self.generation_args)
-
-        result = {
-            'is_greeting': False,
-            'response': output[0]['generated_text']
-        }
-        self._cache_response(prepared["cache_key"], result)
-        return result
+    def _chat_external(self, prompt):
+        """Chat using external LLM server"""
+        # Check for greeting
+        normalized_prompt = self._normalize_text(prompt)
+        
+        if self.is_greeting(normalized_prompt):
+            return {
+                'is_greeting': True,
+                'choices': self.get_greeting_choices()
+            }
+        
+        # Check cache
+        cached = self._get_cached_response(normalized_prompt)
+        if cached is not None:
+            return cached
+        
+        # Check if out of scope
+        label = self.lightweight_classify(prompt)
+        if label == "non-medical":
+            result = {
+                'is_greeting': False,
+                'response': self.out_of_scope_message
+            }
+            self._cache_response(normalized_prompt, result)
+            return result
+        
+        # Call external LLM
+        response = self.external_llm.generate_response(prompt, max_tokens=1000)
+        
+        if response['success']:
+            result = {
+                'is_greeting': False,
+                'response': response['response']
+            }
+            self._cache_response(normalized_prompt, result)
+            return result
+        else:
+            return {
+                'is_greeting': False,
+                'response': f"Error from LLM server: {response['error']}"
+            }
 
     def stream_chat(self, prompt):
-        """Stream responses directly from the model when generation is needed."""
-        prepared = self._prepare_prompt(prompt)
-
-        if prepared["mode"] == "final":
-            result = prepared["result"]
-            if result.get("is_greeting"):
-                choices = result.get("choices", [])
-                intro = "Here are a few ways I can help you get started:\n\n"
-                yield {"token": intro}
-                for index, choice in enumerate(choices, start=1):
-                    prefix = f"{index}. "
-                    suffix = "\n\n" if index < len(choices) else ""
-                    yield {"token": f"{prefix}{choice}{suffix}"}
-            else:
-                for chunk in self._chunk_text(result.get("response", "")):
-                    yield {"token": chunk}
+        """Stream chat responses using Colab LLM (required)
+        Chat REQUIRES external LLM from Colab - no fallback to local model.
+        """
+        # Chat REQUIRES external LLM from Colab - no fallback to local
+        if not self.external_llm_url:
+            yield {'error': 'Chat is unavailable. Please configure EXTERNAL_LLM_URL to connect to Colab LLM server.'}
             return
-
-        streamer = TextIteratorStreamer(
-            self.tokenizer,
-            skip_prompt=True,
-            skip_special_tokens=True,
-        )
-        generation_kwargs = {
-            **self.generation_args,
-            "streamer": streamer,
-        }
-
-        def _run_generation():
-            inference_context = torch.inference_mode if hasattr(torch, "inference_mode") else nullcontext
-            with inference_context():
-                self.pipe(prepared["messages"], **generation_kwargs)
-
-        with self.generation_lock:
-            worker = Thread(
-                target=_run_generation,
-                daemon=True,
-            )
-            worker.start()
-
-            generated_parts = []
-            for token in streamer:
-                generated_parts.append(token)
+        
+        if not self.use_external_llm:
+            yield {'error': 'Chat is unavailable. Cannot connect to Colab LLM server. Ensure the Colab notebook is running.'}
+            return
+        
+        # Use external LLM streaming only
+        yield from self._stream_chat_external(prompt)
+    
+    def _stream_chat_external(self, prompt):
+        """Stream chat responses from external LLM server"""
+        # Do all context-sensitive operations BEFORE yielding
+        normalized_prompt = self._normalize_text(prompt)
+        
+        # Check for greeting
+        is_greeting = self.is_greeting(normalized_prompt)
+        if is_greeting:
+            choices = self.get_greeting_choices()
+            intro = "Here are a few ways I can help you get started:\n\n"
+            yield {"token": intro}
+            for index, choice in enumerate(choices, start=1):
+                prefix = f"{index}. "
+                suffix = "\n\n" if index < len(choices) else ""
+                yield {"token": f"{prefix}{choice}{suffix}"}
+            return
+        
+        # Check cache (before any yields)
+        cached = self._get_cached_response(normalized_prompt)
+        if cached is not None:
+            response_text = cached.get('response', '')
+            for chunk in self._chunk_text(response_text):
+                yield {"token": chunk}
+            return
+        
+        # Check if out of scope (before any streaming yields)
+        label = self.lightweight_classify(prompt)
+        is_out_of_scope = (label == "non-medical")
+        
+        if is_out_of_scope:
+            for chunk in self._chunk_text(self.out_of_scope_message):
+                yield {"token": chunk}
+            # Cache after all yields
+            self._cache_response(normalized_prompt, {
+                'is_greeting': False,
+                'response': self.out_of_scope_message
+            })
+            return
+        
+        # Stream from external LLM
+        full_response = ""
+        for event in self.external_llm.stream_response(prompt, max_tokens=1000):
+            if event.get('error'):
+                error_msg = f"Error: {event['error']}"
+                yield {"error": error_msg}
+                return
+            elif event.get('token') and event['token'] != '[DONE]':
+                token = event['token']
+                full_response += token
                 yield {"token": token}
-
-            worker.join()
-
-        result = {
-            'is_greeting': False,
-            'response': ''.join(generated_parts).strip()
-        }
-        self._cache_response(prepared["cache_key"], result)
+        
+        # Cache the full response after streaming is complete
+        if full_response:
+            self._cache_response(normalized_prompt, {
+                'is_greeting': False,
+                'response': full_response
+            })
     
     def is_loaded(self):
         """Check if model is loaded"""
+        if self.use_external_llm:
+            return True
         return self.model is not None and self.tokenizer is not None and self.pipe is not None

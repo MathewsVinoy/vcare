@@ -8,8 +8,23 @@ from models.image_model import ImageModel
 
 app = Flask(__name__)
 
+# ========== EXTERNAL LLM CONFIGURATION ==========
+# ⚠️  REQUIRED: Chat feature requires Colab LLM connection
+# Set the public ngrok URL from your running Colab notebook:
+EXTERNAL_LLM_URL = "https://inquiries-galleries-elegant-developments.trycloudflare.com"
+# 
+# Setup Steps:
+# 1. Run the colab_llm_server.ipynb in Google Colab
+# 2. Copy the public URL from cell output
+# 3. Set environment variable: export EXTERNAL_LLM_URL="https://xxxxx.ngrok.io"
+# 4. Restart this Flask app
+# 
+# Note: Blood sample and image detection work without Colab.
+#       Chat feature requires Colab LLM connection.
+# =============================================
+
 # Initialize model instances
-chat_model = ChatModel()
+chat_model = ChatModel(external_llm_url=EXTERNAL_LLM_URL)
 blood_model = BloodModel()
 image_model = ImageModel()
 
@@ -190,17 +205,25 @@ def chat_stream_endpoint():
             return jsonify({'error': 'Empty message'}), 400
 
         def token_stream():
-            for event in chat_model.stream_chat(user_message):
-                if event.get('error'):
-                    yield f"data: {json.dumps({'error': event['error']})}\n\n"
-                elif event.get('token'):
-                    yield f"data: {json.dumps({'token': event['token']})}\n\n"
-            yield "data: [DONE]\n\n"
+            try:
+                for event in chat_model.stream_chat(user_message):
+                    if event.get('error'):
+                        yield f"data: {json.dumps({'error': event['error']})}\n\n"
+                    elif event.get('token'):
+                        yield f"data: {json.dumps({'token': event['token']})}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                yield "data: [DONE]\n\n"
 
         return Response(
             stream_with_context(token_stream()),
             mimetype='text/event-stream',
-            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+            headers={
+                'Cache-Control': 'no-cache', 
+                'X-Accel-Buffering': 'no',
+                'Connection': 'keep-alive'
+            }
         )
 
     except Exception as e:
@@ -211,7 +234,11 @@ def chat_stream_endpoint():
         return Response(
             stream_with_context(error_stream()),
             mimetype='text/event-stream',
-            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+            headers={
+                'Cache-Control': 'no-cache', 
+                'X-Accel-Buffering': 'no',
+                'Connection': 'keep-alive'
+            }
         )
 
 @app.route('/health')
