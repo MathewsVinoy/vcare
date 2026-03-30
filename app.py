@@ -11,7 +11,7 @@ app = Flask(__name__)
 # ========== EXTERNAL LLM CONFIGURATION ==========
 # ⚠️  REQUIRED: Chat feature requires Colab LLM connection
 # Set the public ngrok URL from your running Colab notebook:
-EXTERNAL_LLM_URL = "https://inquiries-galleries-elegant-developments.trycloudflare.com"
+EXTERNAL_LLM_URL = os.environ.get("EXTERNAL_LLM_URL", "https://solely-edmonton-revelation-acts.trycloudflare.com")
 # 
 # Setup Steps:
 # 1. Run the colab_llm_server.ipynb in Google Colab
