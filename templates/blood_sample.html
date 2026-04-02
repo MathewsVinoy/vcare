@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blood Analysis — VCare AI Pro</title>
+    <title>Blood Cancer Risk Analysis — VCare AI Pro</title>
     <meta
       name="description"
-      content="AI-powered blood sample analysis for leukemia, cancer, and disease risk prediction with real-time analysis."
+      content="AI-powered binary blood cancer risk prediction with probability from complete blood count parameters."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -59,7 +59,7 @@
         </a>
         <a href="/blood_sample" class="nav-item active" id="nav-blood">
           <div class="nav-item-icon"><i class="fas fa-vial"></i></div>
-          <span>Blood Analysis</span>
+          <span>Blood Cancer Risk</span>
         </a>
         <a href="/image_detection" class="nav-item" id="nav-image">
           <div class="nav-item-icon"><i class="fas fa-microscope"></i></div>
@@ -80,7 +80,7 @@
         <button class="topbar-menu-btn" id="mobileMenuBtn">
           <i class="fas fa-bars"></i>
         </button>
-        <div class="topbar-title">Blood Analysis</div>
+        <div class="topbar-title">Blood Cancer Risk</div>
         <div class="topbar-status">
           <span class="status-dot active"></span>
           <span class="status-text">Model Ready</span>
@@ -93,10 +93,10 @@
             <i class="fas fa-flask-vial"></i>
           </div>
           <div>
-            <h1 class="page-title">Blood Analysis</h1>
+            <h1 class="page-title">Blood Cancer Risk Analysis</h1>
             <p class="page-subtitle">
-              Enter complete blood count parameters for AI-powered disease risk
-              assessment
+              Enter complete blood count parameters for AI-powered binary cancer
+              risk assessment with probability
             </p>
           </div>
         </div>
@@ -111,7 +111,8 @@
               <div>
                 <h2 class="form-card-title">Complete Blood Count</h2>
                 <p class="form-card-subtitle">
-                  Enter 16 blood test parameters and measurements
+                  Enter 16 blood test parameters used for binary cancer
+                  prediction
                 </p>
               </div>
             </div>
@@ -127,8 +128,6 @@
                     id="hb"
                     name="hb"
                     placeholder="12.5"
-                    min="0"
-                    max="20"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-vial"></i></span>
@@ -146,8 +145,6 @@
                     id="rbc"
                     name="rbc"
                     placeholder="4.5"
-                    min="0"
-                    max="10"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-circle"></i></span>
@@ -165,8 +162,6 @@
                     id="wbc"
                     name="wbc"
                     placeholder="7500"
-                    min="0"
-                    max="50000"
                     required
                   />
                   <span class="input-icon"
@@ -186,8 +181,6 @@
                     id="platelets"
                     name="platelets"
                     placeholder="275000"
-                    min="0"
-                    max="1000000"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-burst"></i></span>
@@ -205,8 +198,6 @@
                     id="lymp"
                     name="lymp"
                     placeholder="30"
-                    min="0"
-                    max="100"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-percent"></i></span>
@@ -224,8 +215,6 @@
                     id="mono"
                     name="mono"
                     placeholder="5"
-                    min="0"
-                    max="100"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-percent"></i></span>
@@ -241,8 +230,6 @@
                     id="hct"
                     name="hct"
                     placeholder="36.5"
-                    min="0"
-                    max="60"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-percent"></i></span>
@@ -260,8 +247,6 @@
                     id="mcv"
                     name="mcv"
                     placeholder="85"
-                    min="0"
-                    max="150"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-ruler"></i></span>
@@ -279,8 +264,6 @@
                     id="mch"
                     name="mch"
                     placeholder="28"
-                    min="0"
-                    max="50"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-dna"></i></span>
@@ -298,8 +281,6 @@
                     id="mchc"
                     name="mchc"
                     placeholder="33.5"
-                    min="0"
-                    max="40"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-flask"></i></span>
@@ -317,8 +298,6 @@
                     id="rdw"
                     name="rdw"
                     placeholder="13.5"
-                    min="0"
-                    max="30"
                     required
                   />
                   <span class="input-icon"
@@ -336,8 +315,6 @@
                     id="pdw"
                     name="pdw"
                     placeholder="13.8"
-                    min="0"
-                    max="30"
                     required
                   />
                   <span class="input-icon"
@@ -357,8 +334,6 @@
                     id="mpv"
                     name="mpv"
                     placeholder="10"
-                    min="0"
-                    max="20"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-ruler"></i></span>
@@ -374,8 +349,6 @@
                     id="pct"
                     name="pct"
                     placeholder="0.28"
-                    min="0"
-                    max="1"
                     required
                   />
                   <span class="input-icon"><i class="fas fa-percent"></i></span>
@@ -418,8 +391,6 @@
                     id="age"
                     name="age"
                     placeholder="45"
-                    min="1"
-                    max="120"
                     required
                   />
                   <span class="input-icon"
@@ -432,12 +403,7 @@
           </div>
 
           <div class="form-actions">
-            <button
-              type="submit"
-              class="btn-primary"
-              id="predictBtn"
-              onclick="return false;"
-            >
+            <button type="submit" class="btn-primary" id="predictBtn">
               <i class="fas fa-wand-magic-sparkles"></i>
               <span>Run Analysis</span>
             </button>

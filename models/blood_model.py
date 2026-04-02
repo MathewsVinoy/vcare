@@ -128,32 +128,39 @@ class BloodModel:
             if features_array.shape != (1, 16):
                 raise ValueError(f"Expected shape (1, 16), got {features_array.shape}")
             
-            # Make prediction
-            prediction = int(self.model.predict(features_array)[0])
-            
-            # Get probability if available
+            # Make binary prediction
+            raw_model_pred = self.model.predict(features_array)[0]
+            predicted_class = int(float(raw_model_pred))
+
+            # Get probability if available (positive class probability)
             probability = None
+            positive_probability = None
             try:
-                probabilities = self.model.predict_proba(features_array)[0]
-                # Get probability of the predicted class
-                probability = float(probabilities[prediction])
+                probabilities_array = self.model.predict_proba(features_array)[0]
+                if len(probabilities_array) >= 2:
+                    positive_probability = float(probabilities_array[1])
+                    probability = positive_probability
+                else:
+                    probability = float(probabilities_array[predicted_class])
             except (AttributeError, IndexError, TypeError):
                 # Model doesn't support predict_proba or different structure
                 probability = None
-            
+
             # Generate human-readable prediction
-            if prediction == 1:
-                diagnosis = "⚠️ Leukemia Risk — POSITIVE"
+            if predicted_class == 1:
+                diagnosis = "⚠️ Blood Cancer Risk — POSITIVE"
                 confidence_text = "High Risk Detected"
             else:
-                diagnosis = "✓ Normal — NEGATIVE"
+                diagnosis = "✓ Blood Cancer Risk — NEGATIVE"
                 confidence_text = "Low Risk Detected"
             
             return {
                 'prediction': diagnosis,
                 'confidence': confidence_text,
                 'probability': probability,
-                'raw_prediction': prediction,
+                'probability_positive': positive_probability,
+                'raw_prediction': predicted_class,
+                'predicted_class': predicted_class,
                 'model_type': self.model_type,
                 'success': True
             }

@@ -1,9 +1,9 @@
 """
 Advanced Blood Sample Classification with CatBoost
-Trains a CatBoost classifier for blood disease diagnosis
+Trains a CatBoost binary classifier for blood cancer risk
 
 Features (16): Gender, Age, Hb, RBC, WBC, PLATELETS, LYMP, MONO, HCT, MCV, MCH, MCHC, RDW, PDW, MPV, PCT
-Target: Diagnosis (disease type classification)
+Target: Cancer Risk (0 = Non-cancer, 1 = Cancer)
 
 Run: python train_script/blood_sample.py
 """
@@ -13,7 +13,6 @@ import numpy as np
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
-from sklearn.preprocessing import LabelEncoder
 from catboost import CatBoostClassifier
 from joblib import dump
 import warnings
@@ -47,9 +46,13 @@ FEATURE_NAMES = [
 # ─────────────────────────────────────────────
 print("\n🔄 Preprocessing data...")
 
-# Extract features and target
+# Extract features
 X = df1.drop("Diagnosis", axis=1)
-y = df1["Diagnosis"]
+
+# Build binary target from diagnosis labels
+# 1 = Blood cancer classes, 0 = Non-cancer classes
+CANCER_LABELS = {"Chronic Leukemias", "Polycythemia Vera"}
+y = df1["Diagnosis"].apply(lambda d: 1 if str(d).strip() in CANCER_LABELS else 0)
 
 # Verify feature names
 if list(X.columns) != FEATURE_NAMES:
@@ -61,21 +64,17 @@ else:
 
 print(f"Features shape: {X.shape}")
 print(f"Target shape: {y.shape}")
-
-# Encode labels
-le = LabelEncoder()
-y_encoded = le.fit_transform(y)
-
-print(f"\nTarget classes ({len(le.classes_)}):")
-for cls, enc in zip(le.classes_, le.transform(le.classes_)):
-    print(f"  • {cls}: {enc}")
+print("\nBinary target distribution:")
+print(f"  • Non-cancer (0): {(y == 0).sum()}")
+print(f"  • Cancer (1): {(y == 1).sum()}")
+print(f"  • Cancer labels: {sorted(CANCER_LABELS)}")
 
 # ─────────────────────────────────────────────
 # Train-Test Split
 # ─────────────────────────────────────────────
 print("\n🔀 Splitting data...")
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+    X, y, test_size=0.2, random_state=42, stratify=y
 )
 
 print(f"Training set: {X_train.shape[0]} samples")
@@ -83,9 +82,9 @@ print(f"Test set: {X_test.shape[0]} samples")
 print(f"Training target distribution:\n{pd.Series(y_train).value_counts()}")
 
 # ─────────────────────────────────────────────
-# CatBoost Classifier
+# CatBoost Classifier (Binary)
 # ─────────────────────────────────────────────
-print("\n🤖 Training CatBoost model...")
+print("\n🤖 Training CatBoost binary model...")
 
 cat_model = CatBoostClassifier(
     iterations=100,
@@ -93,8 +92,9 @@ cat_model = CatBoostClassifier(
     depth=6,
     random_seed=42,
     verbose=0,
-    loss_function='Logloss',  # Binary classification
-    eval_metric='AUC'
+    loss_function='Logloss',
+    eval_metric='AUC',
+    auto_class_weights='Balanced'
 )
 
 # Train Model
@@ -105,20 +105,23 @@ cat_model.fit(X_train, y_train, verbose=False)
 # ─────────────────────────────────────────────
 print("\n📈 Evaluating model...")
 
-y_pred = cat_model.predict(X_test)
+y_pred = cat_model.predict(X_test).astype(int).flatten()
 y_pred_proba = cat_model.predict_proba(X_test)[:, 1]
 
 accuracy = accuracy_score(y_test, y_pred)
-precision = precision_score(y_test, y_pred, average='binary')
-recall = recall_score(y_test, y_pred, average='binary')
-f1 = f1_score(y_test, y_pred, average='binary')
+precision = precision_score(y_test, y_pred, zero_division=0)
+recall = recall_score(y_test, y_pred, zero_division=0)
+f1 = f1_score(y_test, y_pred, zero_division=0)
 roc_auc = roc_auc_score(y_test, y_pred_proba)
+cm = confusion_matrix(y_test, y_pred)
 
 print(f"Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%)")
 print(f"Precision: {precision:.4f}")
 print(f"Recall:    {recall:.4f}")
 print(f"F1 Score:  {f1:.4f}")
 print(f"ROC-AUC:   {roc_auc:.4f}")
+print("\nConfusion Matrix [ [TN, FP], [FN, TP] ]:")
+print(cm)
 
 # Feature importance
 print("\n🎯 Top Features:")
@@ -142,10 +145,10 @@ print(f"✅ Model saved to '{model_path}'")
 print(f"   Model type: {type(cat_model).__name__}")
 print(f"   Model size: {os.path.getsize(model_path) / (1024*1024):.2f} MB")
 
-# Save label encoder
-encoder_path = 'model/label_encoder.joblib'
-dump(le, encoder_path)
-print(f"✅ Label encoder saved to '{encoder_path}'")
+# Save model metadata
+meta_path = 'model/blood_model_meta.joblib'
+dump({'task': 'binary_cancer_classification', 'cancer_labels': sorted(CANCER_LABELS)}, meta_path)
+print(f"✅ Model metadata saved to '{meta_path}'")
 
 print("\n" + "=" * 60)
 print("  ✨ Training Complete!")
