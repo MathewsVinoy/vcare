@@ -98,24 +98,7 @@ def predict_blood_sample():
                 'success': False
             }), 400
         
-        # Validate ranges
-        validation_errors = []
-        if features[1] < 1 or features[1] > 120:
-            validation_errors.append('Age must be between 1 and 120 years')
-        if features[0] not in [0, 1]:
-            validation_errors.append('Gender must be 0 (Male) or 1 (Female)')
-        if features[2] < 0 or features[2] > 20:
-            validation_errors.append('Hemoglobin must be between 0 and 20 g/dL')
-        if features[4] < 0 or features[4] > 50000:
-            validation_errors.append('WBC must be between 0 and 50,000 cells/µL')
-        if features[5] < 0 or features[5] > 1000000:
-            validation_errors.append('Platelets must be between 0 and 1,000,000 cells/µL')
-        
-        if validation_errors:
-            return jsonify({
-                'error': 'Validation errors: ' + '; '.join(validation_errors),
-                'success': False
-            }), 400
+        # No strict numeric range restrictions: allow any valid numeric values.
         
         # Convert to numpy array with shape (1, 16)
         import numpy as np

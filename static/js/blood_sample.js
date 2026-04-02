@@ -104,10 +104,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showResult(data) {
-    const isPositive = data.raw_prediction === 1;
+    const isPositive = Number(data.raw_prediction) === 1;
     const prob =
       data.probability !== null ? (data.probability * 100).toFixed(1) : null;
+    const posProb =
+      data.probability_positive !== null &&
+      data.probability_positive !== undefined
+        ? (data.probability_positive * 100).toFixed(1)
+        : prob;
     const confidence = prob !== null ? `${prob}%` : "N/A";
+    const positiveConfidence = posProb !== null ? `${posProb}%` : "N/A";
     const riskClass = isPositive ? "high" : "low";
     const riskIcon = isPositive ? "fa-circle-exclamation" : "fa-circle-check";
     const timestamp = new Date().toLocaleString();
@@ -120,25 +126,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
             <div class="risk-badge ${riskClass}">
                 <i class="fas ${riskIcon}"></i>
-                ${data.prediction}
+              ${data.prediction || (isPositive ? "⚠️ Blood Cancer Risk — POSITIVE" : "✓ Blood Cancer Risk — NEGATIVE")}
             </div>
 
             <div class="result-details">
                 <div class="detail-item">
                     <span class="detail-label">Analysis Type:</span>
-                    <span class="detail-value">${data.model_type || "CatBoost Classification Model"}</span>
+                  <span class="detail-value">${data.model_type || "CatBoost Binary Classification Model"}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Timestamp:</span>
                     <span class="detail-value">${timestamp}</span>
                 </div>
                 <div class="detail-item">
-                    <span class="detail-label">Raw Prediction:</span>
-                    <span class="detail-value">${isPositive ? "Positive (1)" : "Negative (0)"}</span>
+                  <span class="detail-label">Predicted Class:</span>
+                  <span class="detail-value">${isPositive ? "Positive (1)" : "Negative (0)"}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Confidence:</span>
                     <span class="detail-value">${data.confidence || confidence}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Cancer Probability:</span>
+                    <span class="detail-value">${positiveConfidence}</span>
                 </div>
             </div>
 
@@ -161,8 +171,8 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="result-description">
                 ${
                   isPositive
-                    ? "<strong>High Risk Indicators Detected:</strong> The analysis identified elevated bone marrow blasts, abnormal blood cell counts, or other concerning markers. <strong>Immediate medical consultation is recommended.</strong>"
-                    : "<strong>Normal Risk Profile:</strong> Blood parameters are within normal ranges. No strong indicators of leukemia were detected based on the provided test data."
+                    ? "<strong>High Risk Detected:</strong> The model indicates elevated blood cancer risk. <strong>Immediate medical consultation is recommended.</strong>"
+                    : "<strong>Low Risk Detected:</strong> The model indicates no blood cancer risk signal for this sample."
                 }
             </div>
 
