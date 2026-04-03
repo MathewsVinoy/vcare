@@ -119,8 +119,8 @@ class ChatModel:
         }
 
         self.out_of_scope_message = (
-            "Sorry, I can only assist with cancer-related or medical questions. "
-            "Please ask about symptoms, diagnosis, treatment, reports, or other health concerns."
+            "I can help with health and cancer questions only. "
+            "Please ask about symptoms, reports, treatment, or diagnosis."
         )
 
         self.max_cached_responses = 128
@@ -404,25 +404,52 @@ class ChatModel:
             pass
 
     def build_domain_prompt(self, prompt, label):
-        """Add a domain instruction based on the detected topic."""
+        """Add a simple doctor-style instruction based on the detected topic."""
         if label == "cancer":
             domain_instruction = (
-                "You are VCare AI, a cancer-focused medical assistant. "
-                "Answer only in the context of cancer, oncology, diagnosis support, symptoms, screening, reports, "
-                "risk factors, and treatment guidance. Keep the response clear, supportive, and medically relevant. "
-                "Always remind the user to consult a qualified doctor for diagnosis or treatment decisions."
+                "You are VCare AI, a calm doctor speaking to a patient. "
+                "Reply in very simple words. Keep the answer short, clear, and supportive. "
+                "Focus only on cancer, symptoms, reports, screening, diagnosis support, and treatment guidance. "
+                "If the issue sounds serious, tell the patient to see a qualified doctor. "
+                "Do not mention that you are an AI unless needed. "
+                "Always include: (1) what the patient should do now, and (2) which tests they can discuss with their doctor."
             )
         else:
             domain_instruction = (
-                "You are VCare AI, a medical assistant. "
-                "Answer only medical or health-related questions in a clear and careful way. "
-                "Do not provide unrelated information. Encourage consulting a qualified doctor for urgent or serious concerns."
+                "You are VCare AI, a calm doctor speaking to a patient. "
+                "Reply in very simple words. Keep the answer short, clear, and helpful. "
+                "Answer only medical or health-related questions. "
+                "If the issue sounds serious, tell the patient to see a qualified doctor. "
+                "Do not mention that you are an AI unless needed. "
+                "Always include: (1) what the patient should do now, and (2) which tests they can discuss with their doctor."
             )
 
         return [
             {"role": "system", "content": domain_instruction},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": f"Patient question: {prompt}"}
         ]
+
+    def build_simple_reply_prompt(self, prompt, label):
+        """Build a plain text prompt for the external LLM."""
+        if label == "cancer":
+            focus = "cancer and oncology"
+        else:
+            focus = "general medical or health"
+
+        return (
+            "You are VCare AI, a calm doctor speaking to a patient. "
+            "Reply in very simple words. Keep the answer short, clear, and supportive. "
+            f"Focus only on {focus}. "
+            "Answer like a doctor replying to a patient. "
+            "If the question sounds serious or urgent, tell the patient to see a qualified doctor. "
+            "Always include practical suggestions the patient should do now and tests they should discuss with a doctor. "
+            "Use this short format:\n"
+            "1) Possible reason\n"
+            "2) What you should do now\n"
+            "3) Tests to discuss with your doctor\n\n"
+            f"Patient question: {prompt}\n"
+            "Doctor reply:"
+        )
 
     def _prepare_prompt(self, prompt):
         """Resolve greeting, cached, rejected, or model-backed prompt handling."""
@@ -583,7 +610,8 @@ class ChatModel:
             return result
         
         # Call external LLM
-        response = self.external_llm.generate_response(prompt, max_tokens=1000)
+        styled_prompt = self.build_simple_reply_prompt(prompt, label)
+        response = self.external_llm.generate_response(styled_prompt, max_tokens=1000)
         
         if response['success']:
             result = {
@@ -655,7 +683,8 @@ class ChatModel:
         
         # Stream from external LLM
         full_response = ""
-        for event in self.external_llm.stream_response(prompt, max_tokens=1000):
+        styled_prompt = self.build_simple_reply_prompt(prompt, label)
+        for event in self.external_llm.stream_response(styled_prompt, max_tokens=1000):
             if event.get('error'):
                 error_msg = f"Error: {event['error']}"
                 yield {"error": error_msg}
