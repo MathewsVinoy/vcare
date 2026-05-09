@@ -1,0 +1,59 @@
+\contentsline {chapter}{\textit {Acknowledgement}}{ii}{chapter*.5}%
+\contentsline {chapter}{\textit {Contents}}{x}{table.caption.7}%
+\contentsline {chapter}{\textit {List of Figures}}{xii}{table.caption.7}%
+\contentsline {chapter}{\textit {Abbreviations}}{xiii}{chapter*.8}%
+\contentsline {chapter}{\numberline {1}INTRODUCTION}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Vision Transformer (ViT) – Medical Image Classification Model}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Fine-Tuned Large Language Model (LLM) – Clinical Text Understanding}{2}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Blood Report Analysis Model – Predictive Cancer Detection}{2}{section.1.3}%
+\contentsline {chapter}{\numberline {2}EXISTING SYSTEM}{4}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Introduction to Existing Cancer Diagnosis Systems}{4}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Manual Diagnosis and Clinical Dependency}{4}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Imaging-Based Diagnostic Systems}{5}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3} Histopathological Analysis}{6}{subsection.2.1.3}%
+\contentsline {subsection}{\numberline {2.1.4}Computer-Aided Diagnosis Systems}{6}{subsection.2.1.4}%
+\contentsline {subsection}{\numberline {2.1.5}Traditional Machine Learning Approaches}{7}{subsection.2.1.5}%
+\contentsline {subsection}{\numberline {2.1.6}Deep Learning-Based Existing Systems}{7}{subsection.2.1.6}%
+\contentsline {subsection}{\numberline {2.1.7}Limitations in Handling Multi-Cancer Detection}{8}{subsection.2.1.7}%
+\contentsline {subsection}{\numberline {2.1.8}Computational and Infrastructure Limitations}{8}{subsection.2.1.8}%
+\contentsline {subsection}{\numberline {2.1.9} Ethical and Practical Concerns}{8}{subsection.2.1.9}%
+\contentsline {section}{\numberline {2.2}Summary of Existing System}{9}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Disadvantages of Existing System}{9}{section.2.3}%
+\contentsline {chapter}{\numberline {3}PROPOSED SYSTEM}{10}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Introduction to the Proposed System}{10}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Objectives of the Proposed System}{10}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Advantages Over Existing Systems}{11}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Multi-Cancer Detection Capability}{11}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Role of Artificial Intelligence}{12}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Scalability and Real-World Application}{12}{subsection.3.3.3}%
+\contentsline {section}{\numberline {3.4}PROPOSED METHODOLOGY}{12}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Overview of Methodology}{12}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Data Collection}{12}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.4.3}Data Preprocessing}{12}{subsection.3.4.3}%
+\contentsline {subsection}{\numberline {3.4.4}Feature Extraction}{13}{subsection.3.4.4}%
+\contentsline {subsection}{\numberline {3.4.5}Model Training}{13}{subsection.3.4.5}%
+\contentsline {subsection}{\numberline {3.4.6}Model Evaluation}{13}{subsection.3.4.6}%
+\contentsline {subsection}{\numberline {3.4.7}Integration of Modules}{13}{subsection.3.4.7}%
+\contentsline {subsection}{\numberline {3.4.8}Deployment}{14}{subsection.3.4.8}%
+\contentsline {section}{\numberline {3.5}IMPLEMENTATION DETAILS}{14}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}Technology Stack and Runtime Environment}{14}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}Model Training Configuration and Monitoring}{14}{subsection.3.5.2}%
+\contentsline {section}{\numberline {3.6}MODULES}{15}{section.3.6}%
+\contentsline {subsection}{\numberline {3.6.1}LLM MODULE FOR CHATTING AND DOUBT CLEARING}{15}{subsection.3.6.1}%
+\contentsline {subsection}{\numberline {3.6.2}IMAGE CLASSIFICATION MODULE USING ViT}{15}{subsection.3.6.2}%
+\contentsline {subsection}{\numberline {3.6.3}BLOOD REPORT ANALYSING MODULE USING CATBOOST ALGORITHM}{15}{subsection.3.6.3}%
+\contentsline {section}{\numberline {3.7}SYSTEM ARCHITECTURE OVERVIEW}{16}{section.3.7}%
+\contentsline {section}{\numberline {3.8}SAMPLE CODE}{17}{section.3.8}%
+\contentsline {chapter}{\numberline {4}RESULTS}{21}{chapter.4}%
+\contentsline {section}{\numberline {4.1}System Workflow Overview}{21}{section.4.1}%
+\contentsline {section}{\numberline {4.2}User Uploads Medical Image \& Medical Reports}{21}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Pre-Processing of Images \& Medical Report Parsing}{21}{section.4.3}%
+\contentsline {section}{\numberline {4.4}System Interface and User Interactions}{22}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Vision Transformer Extracts Cancer-Related Features}{23}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Model Predicts Cancer Type \& Uses Report Data}{23}{section.4.6}%
+\contentsline {section}{\numberline {4.7}AI Assistant: Q\&A \& Medical Guidance}{24}{section.4.7}%
+\contentsline {section}{\numberline {4.8}Final Diagnosis Report \& Review}{25}{section.4.8}%
+\contentsline {section}{\numberline {4.9}Quantitative Performance Snapshot}{26}{section.4.9}%
+\contentsline {chapter}{\numberline {5}FUTURE SCOPE}{29}{chapter.5}%
+\contentsline {chapter}{\numberline {6}CONCLUSION}{33}{chapter.6}%
+\contentsline {chapter}{References}{34}{chapter.6}%

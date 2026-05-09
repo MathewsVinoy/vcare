@@ -1,0 +1,20 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces System Architecture}}{16}{figure.caption.10}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Blood model prediction function}}{17}{figure.caption.11}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Chat model setup and external LLM configuration}}{18}{figure.caption.12}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces External LLM client health check and response generation}}{19}{figure.caption.13}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces Image model prediction and risk aggregation}}{19}{figure.caption.14}%
+\contentsline {figure}{\numberline {3.6}{\ignorespaces LLM tokenizer, quantization, and pipeline initialization}}{20}{figure.caption.15}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces AI Chat Interface for Medical Guidance}}{22}{figure.caption.16}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Blood Sample Analysis Initialization}}{23}{figure.caption.17}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Image Upload and Analysis Panel}}{24}{figure.caption.18}%
+\contentsline {figure}{\numberline {4.4}{\ignorespaces AI Chat Interface}}{25}{figure.caption.19}%
+\contentsline {figure}{\numberline {4.5}{\ignorespaces Blood Test Results and Leukemia Prediction}}{26}{figure.caption.20}%
+\contentsline {figure}{\numberline {4.6}{\ignorespaces Image Upload and Analysis Panel}}{27}{figure.caption.21}%
+\contentsline {figure}{\numberline {4.7}{\ignorespaces High-Risk Skin Cancer Detection Result}}{27}{figure.caption.22}%
+\contentsline {figure}{\numberline {4.8}{\ignorespaces Detailed Analysis Report with Risk Assessment}}{28}{figure.caption.23}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
