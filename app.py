@@ -20,7 +20,7 @@ app = Flask(__name__)
 # ⚠️  REQUIRED: Chat feature requires Colab LLM connection
 # Set the public ngrok URL from your running Colab notebook:
 EXTERNAL_LLM_URL = os.environ.get(
-    "EXTERNAL_LLM_URL", "https://publicly-absence-sent-thus.trycloudflare.com"
+    "EXTERNAL_LLM_URL", "https://patients-assigned-founder-extras.trycloudflare.com"
 )
 #
 # Setup Steps:

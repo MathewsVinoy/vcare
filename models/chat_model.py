@@ -407,12 +407,7 @@ class ChatModel:
         """Add a simple doctor-style instruction based on the detected topic."""
         if label == "cancer":
             domain_instruction = (
-                "You are VCare AI, a calm doctor speaking to a patient. "
-                "Reply in very simple words. Keep the answer short, clear, and supportive. "
-                "Focus only on cancer, symptoms, reports, screening, diagnosis support, and treatment guidance. "
-                "If the issue sounds serious, tell the patient to see a qualified doctor. "
-                "Do not mention that you are an AI unless needed. "
-                "Always include: (1) what the patient should do now, and (2) which tests they can discuss with their doctor."
+
             )
         else:
             domain_instruction = (
@@ -609,15 +604,8 @@ class ChatModel:
             self._cache_response(normalized_prompt, result)
             return result
         
-        # Format messages for Phi-3
-        messages = self.build_domain_prompt(prompt, label)
-        formatted_prompt = ""
-        for msg in messages:
-            formatted_prompt += f"<|{msg['role']}|>\n{msg['content']}<|end|>\n"
-        formatted_prompt += "<|assistant|>\n"
-        
-        # Call external LLM
-        response = self.external_llm.generate_response(formatted_prompt, max_tokens=1000)
+        # Send the user prompt directly to the external LLM
+        response = self.external_llm.generate_response(prompt, max_tokens=1000)
         
         if response['success']:
             result = {
@@ -687,16 +675,9 @@ class ChatModel:
             })
             return
         
-        # Format messages for Phi-3
-        messages = self.build_domain_prompt(prompt, label)
-        formatted_prompt = ""
-        for msg in messages:
-            formatted_prompt += f"<|{msg['role']}|>\n{msg['content']}<|end|>\n"
-        formatted_prompt += "<|assistant|>\n"
-        
-        # Stream from external LLM
+        # Stream the user prompt directly to the external LLM
         full_response = ""
-        for event in self.external_llm.stream_response(formatted_prompt, max_tokens=1000):
+        for event in self.external_llm.stream_response(prompt, max_tokens=1000):
             if event.get('error'):
                 error_msg = f"Error: {event['error']}"
                 yield {"error": error_msg}
